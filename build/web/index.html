@@ -33,26 +33,6 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-   <script>
-    if ('geolocation' in navigator) {
-      console.log("Geolocation is available");
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log(`Latitude: ${position.coords.latitude}, Longitude: ${position.coords.longitude}`);
-        },
-        (error) => {
-          if (error.code === error.PERMISSION_DENIED) {
-            console.error("Location permission denied.");
-          } else {
-            console.error("Error obtaining location: ", error.message);
-          }
-        }
-      );
-    } else {
-      console.error("Geolocation is not supported by this browser.");
-    }
-  </script>
   <script src="flutter_bootstrap.js" async></script>
-  
 </body>
 </html>
