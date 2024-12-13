@@ -59,7 +59,7 @@ class _AdminLoginState extends State<AdminLogin> {
     } catch (error) {
       print('Error during login: $error');
       _showErrorDialog(
-          'An error occurred. Please check your internet connection.');
+          'An error occurred. Please check your details.');
     }
   }
 

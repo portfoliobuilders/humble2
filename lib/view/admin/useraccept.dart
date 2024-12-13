@@ -215,7 +215,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                 radius: 35,
                 backgroundImage: user.imageUrl.isNotEmpty
                     ? NetworkImage(user.imageUrl)
-                    : const AssetImage('assets/placeholder.png') as ImageProvider,
+                    : const AssetImage('aassets/user (1).png') as ImageProvider,
                 backgroundColor: Colors.grey[200],
               ),
               const SizedBox(width: 16),
@@ -258,7 +258,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                     radius: 35,
                     backgroundImage: user.imageUrl.isNotEmpty
                         ? NetworkImage(user.imageUrl)
-                        : const AssetImage('assets/placeholder.png') as ImageProvider,
+                        : const AssetImage('assets/user (1).png') as ImageProvider,
                     backgroundColor: Colors.grey[200],
                   ),
                   const SizedBox(width: 16),

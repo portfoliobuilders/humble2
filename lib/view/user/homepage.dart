@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -51,55 +52,75 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _fetchCurrentLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          _currentLocationMessage = "Location services are disabled.";
-        });
-        return;
-      }
+Future<void> _fetchCurrentLocation() async {
+  try {
+    // Check if location services are enabled
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        _currentLocationMessage = "Location services are disabled.";
+      });
+      return;
+    }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+    // Request permissions if necessary
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            _currentLocationMessage = "Location permission denied.";
-          });
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
         setState(() {
-          _currentLocationMessage =
-              "Location permissions are permanently denied.";
+          _currentLocationMessage = "Location permission denied.";
         });
         return;
       }
+    }
 
-      Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.bestForNavigation);
-      List<Placemark> placemarks =
-          await placemarkFromCoordinates(position.latitude, position.longitude);
+    if (permission == LocationPermission.deniedForever) {
+      setState(() {
+        _currentLocationMessage =
+            "Location permissions are permanently denied.";
+      });
+      return;
+    }
+
+    // Get current position
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation);
+
+    // For web compatibility, use a fallback if placemarks are not supported
+    String locationDetails = "${position.latitude}, ${position.longitude}";
+
+    try {
+      // Attempt reverse geocoding
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude, position.longitude);
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks[0];
-        String currentTime = DateFormat('hh:mm a').format(DateTime.now());
-        setState(() {
-          _currentLocationMessage =
-              "${place.name}, ${place.locality}, ${place.administrativeArea}, ${place.country} at $currentTime";
-          _sendCheckinCurrentLocation(_currentLocationMessage ?? "empty");
-        });
+        locationDetails =
+            "${place.name}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
       }
-    } catch (e) {
-      setState(() {
-        _currentLocationMessage = "Error fetching location: $e";
-      });
+    } catch (geocodingError) {
+      // Handle geocoding error gracefully
+      print("Geocoding failed: $geocodingError");
     }
+
+    // Add time and update the state
+    String currentTime = DateFormat('hh:mm a').format(DateTime.now());
+    setState(() {
+      _currentLocationMessage = "$locationDetails at $currentTime";
+    });
+
+    // Send the location to your server or handler
+    _sendCheckinCurrentLocation(_currentLocationMessage ?? "Location unavailable");
+  } catch (e) {
+    // Handle other errors
+    setState(() {
+      _currentLocationMessage = "Error fetching location: $e";
+    });
   }
+}
+
 
   Future<void> _sendCheckinCurrentLocation(
       String _currentLocationMessage) async {
@@ -241,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const CircleAvatar(
               radius: 20,
-              backgroundImage: AssetImage('assets/profile.jpg'),
+              backgroundImage: AssetImage('assets/user (1).png'),
             ),
             const SizedBox(width: 12),
             Column(
@@ -308,27 +329,20 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            const Expanded(
-              child: AttendanceCard(
-                title: 'Check In',
-                time: '05:00 am',
-                subtitle: 'In Time',
-                icon: Icons.login,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: AttendanceCard(
-                title: 'Check Out',
-                time: currentTime,
-                subtitle: 'GoTime',
-                icon: Icons.logout,
-              ),
-            ),
-          ],
-        ),
+      Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    AttendanceCard(
+      title: 'Current time',
+      time: currentTime,
+      subtitle: '',
+      icon: Icons.time_to_leave,
+    ),
+     // Spacer between the card and total hours
+   
+  ],
+),
+
         const SizedBox(height: 16),
         Row(
           children: const [
