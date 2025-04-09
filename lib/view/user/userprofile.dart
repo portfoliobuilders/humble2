@@ -1,338 +1,286 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:humble/services/userlogout.dart';
-import 'package:humble/view/user/login.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:humble/provider/user_providers.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({Key? key}) : super(key: key);
 
   @override
-  State<UserProfileScreen> createState() => _UserProfileScreenState();
+  _UserProfileScreenState createState() => _UserProfileScreenState();
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  Map<String, dynamic>? userData;
-  bool isLoading = true;
-
-
   @override
   void initState() {
     super.initState();
-    fetchUserProfile();
-    
-  }
-  
-  Future<void>  _logoutuser() async {
-    
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString("userId");
-
-    try {
-      // Extract data from _currentLocationMessage
-    
-
-      // API URL
-      final url =
-          Uri.parse('https://ukproject-dx1c.onrender.com/api/user/userlogout');
-      print(userId);
-      
-      // Construct request body
-      final body = json.encode({
-        "userId": userId,
-        
-      });
-
-      // Make the POST request
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
-
-      // Handle response
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Response: ${json.decode(response.body)}');
-      } else {
-        print('Error: ${response.body}');
-        throw Exception('Failed to send location data');
-      }
-    } catch (e) {
-      print('Exception: $e');
-    }
+    // Fetch user profile when the screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchUserProfile();
+    });
   }
 
-  Future<void> fetchUserProfile() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString("userId");
+  void _fetchUserProfile() {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    userProvider.fetchUserProfileProvider();
+  }
 
-    final url = "https://ukproject-dx1c.onrender.com/api/user/$userId/getUserProfile";
-    try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          setState(() {
-            userData = data['user'];
-            isLoading = false;
-          });
-        } else {
-          throw Exception(data['message']);
-        }
-      } else {
-        throw Exception("Failed to fetch user profile. Status code: ${response.statusCode}");
-      }
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: ${e.toString()}")),
-      );
-    }
+  void _logout() {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    userProvider.logoutProvider(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 4,
-        title: const Text(
-          'My Profile',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      backgroundColor: const Color(0xFF2196F3),
+      bottomNavigationBar: SizedBox(height: 0), // Force extension to bottom
       body: SafeArea(
-        child: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : userData == null
-                ? const Center(child: Text("Failed to load user data."))
-                : SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        // Profile Section
-                        Container(
-                          width: 900,
-                          height: 300,
-                          margin: const EdgeInsets.all(18),
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2D5FFF),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+        child: Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            if (userProvider.userProfile == null) {
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              );
+            }
+
+            final user = userProvider.userProfile!.user;
+
+            return Stack(
+              children: [
+                Column(
+                  children: [
+                    // App Bar
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            height: 60,
                           ),
-                          child: Column(
-                            children: [
-                              SizedBox(height:50,),
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  color: Colors.grey[200],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Image.asset(
-                                    'assets/user (1).png',
-                                    fit: BoxFit.cover,
+                          const Spacer(),
+                          Text(
+                            'My Profile',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 80),
+
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(30)),
+                        ),
+                        child: SingleChildScrollView(
+                          physics: AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: MediaQuery.of(context).size.height - 150,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.max,
+                              children: [
+                                SizedBox(height: 110),
+
+                                Text(
+                                  user.name.toUpperCase(),
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '${userData!['firstname']} ${userData!['lastname']}',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                const SizedBox(height: 6),
+                                Text(
+                                  "Floor Manager",
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 14,
+                                    color: Colors.blue,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                userData!['role'] ?? 'User',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.blue[200],
+
+                                // Contact Section
+                                _buildSectionHeader('CONTACT'),
+                                Container(
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      _buildContactItem(Icons.email, user.email),
+                                      const SizedBox(height: 16),
+                                      _buildContactItem(
+                                          Icons.phone, user.phoneNumber),
+                                      const SizedBox(height: 16),
+                                      _buildContactItem(
+                                          Icons.location_on, "Taman Anggrek"),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Contact & Account Sections
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SectionTitle(title: 'CONTACT'),
-                              const SizedBox(height: 16),
-                              ContactItem(
-                                icon: Icons.email_outlined,
-                                text: userData!['email'] ?? 'N/A',
-                              ),
-                              const SizedBox(height: 32),
-                              const SectionTitle(title: 'ACCOUNT'),
-                              const SizedBox(height: 16),
-                              AccountItem(
-                                icon: Icons.person_outline,
-                                title: 'Personal Data',
-                                onTap: () {},
-                              ),
-                              AccountItem(
-                                icon: Icons.lock_outline,
-                                title: 'Change Password',
-                                onTap: () {},
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Logout Button
-                        const SizedBox(height: 200),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: ElevatedButton(
-                            onPressed: () {
-                              _logoutuser();Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => SignInPage()),
-                            );
-                            },
-                            
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2D5FFF),
-                              minimumSize: const Size(double.infinity, 48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Logout',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
+
+                                // Account Section
+                                const SizedBox(height: 24),
+                                _buildSectionHeader('ACCOUNT'),
+                                Container(
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      _buildAccountItem(
+                                        context,
+                                        Icons.person_outline,
+                                        'Personal Data',
+                                        () {}, // Add navigation
+                                      ),
+                                      _buildAccountItem(
+                                        context,
+                                        Icons.lock_outline,
+                                        'Change Password',
+                                        () {},
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Logout Button
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 30),
+                                  child: ElevatedButton(
+                                    onPressed: _logout,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2196F3),
+                                      minimumSize:
+                                          const Size(double.infinity, 50),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Logout',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Add some bottom padding for better scrolling experience
+                                SizedBox(height: 20),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  top: 100, // Adjust this value to position the image correctly
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      width: 150,
+                      height: 150, // Fixed height instead of double.infinity
+                      decoration: BoxDecoration(
+                        shape: BoxShape.rectangle,
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.blue[100],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 3,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assets/image.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
-}
 
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: GoogleFonts.lato(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+      ),
+    );
+  }
 
-class ContactItem extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const ContactItem({
-    Key? key,
-    required this.icon,
-    required this.text,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildContactItem(IconData icon, String text) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: const Color(0xFF2D5FFF),
-        ),
+        Icon(icon, color: const Color(0xFF2196F3), size: 20),
         const SizedBox(width: 12),
         Text(
           text,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.black87,
-          ),
+          style: GoogleFonts.roboto(fontSize: 14),
         ),
       ],
     );
   }
-}
 
-class AccountItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  const AccountItem({
-    Key? key,
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
+  Widget _buildAccountItem(
+    BuildContext context,
+    IconData icon,
+    String title,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      leading: Icon(icon, color: const Color(0xFF2196F3), size: 22),
+      title: Text(
+        title,
+        style: GoogleFonts.roboto(fontSize: 14),
+      ),
+      trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 22),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: const Color(0xFF2D5FFF),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: Colors.black54,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class SectionTitle extends StatelessWidget {
-  final String title;
-
-  const SectionTitle({Key? key, required this.title}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: Colors.black54,
-      ),
     );
   }
 }

@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:humble/services/conform_checkout.dart';
 import 'package:humble/view/user/ConfirmCheckoutScreen.dart';
+import 'package:provider/provider.dart';
+import 'package:humble/provider/user_providers.dart';
 
 class ConfirmCheckoutScreen extends StatefulWidget {
   const ConfirmCheckoutScreen({Key? key}) : super(key: key);
@@ -12,30 +13,74 @@ class ConfirmCheckoutScreen extends StatefulWidget {
 }
 
 class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _nameController =
+      TextEditingController(); // Nurse's name
+  final TextEditingController _headNurseNameController =
+      TextEditingController(); // Head Nurse's name
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  // List to store the points for drawing the signature
   List<Offset?> _signaturePoints = [];
 
-  // Method to clear the signature area
   void _clearSignature() {
     setState(() {
       _signaturePoints.clear();
     });
   }
 
-  // Method to convert the signature to a string
   String _signatureToString() {
-    // Convert the points to a list of maps
     List<Map<String, double>?> pointData = _signaturePoints
-        .map((point) => point != null
-            ? {'x': point.dx, 'y': point.dy} // Store x and y coordinates
-            : null) // Use null to separate strokes
+        .map((point) => point != null ? {'x': point.dx, 'y': point.dy} : null)
         .toList();
 
-    // Convert the list to a JSON string
     return jsonEncode(pointData);
+  }
+
+  Future<void> _performCheckout() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+      // Check if form is valid
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
+
+      // Check if signature is drawn
+      if (_signaturePoints.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please provide a signature before proceeding.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Convert signature to string
+      String headNurseSignature = _signatureToString();
+
+      // Perform checkout using provider with head nurse name
+      final result = await userProvider.checkOutProvider(
+          headNurseSignature, _headNurseNameController.text);
+
+      // Navigate to Confirmcheckout screen with checkout details
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => Confirmcheckout(
+            nurseInChargeName: _nameController.text,
+            headNurseSignature: headNurseSignature,
+            totalHoursWorked: result['totalHoursWorked'],
+          ),
+        ),
+      );
+    } catch (e) {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Checkout failed: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -47,7 +92,7 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(false),
         ),
       ),
       body: Form(
@@ -73,9 +118,9 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
                   color: Colors.black87,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               const Text(
-                "Nurse's Name",
+                "Head Nurse's Name",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -83,9 +128,9 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
               ),
               const SizedBox(height: 8),
               TextFormField(
-                controller: _nameController,
+                controller: _headNurseNameController,
                 decoration: InputDecoration(
-                  hintText: 'Enter your name',
+                  hintText: 'Enter head nurse name',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Colors.grey),
@@ -97,12 +142,12 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter nurse name';
+                    return 'Please enter head nurse name';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -122,8 +167,6 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 0),
-              // Custom Signature Area (Handwriting area)
               Container(
                 width: double.infinity,
                 height: 250,
@@ -161,27 +204,7 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
               ),
               const Spacer(),
               ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    if (_signaturePoints.isEmpty) {
-                      // Show a message if the signature is not done
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Please provide a signature before proceeding.'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    // If the form and signature are valid, proceed
-                    String signatureString = _signatureToString();
-                    print("Signature JSON String: $signatureString".toString());
-                    // Navigate to the next page
-                      sendCheckOutCurrentLocation(context,signatureString);
-                   
-                  }
-                },
+                onPressed: _performCheckout,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -197,7 +220,8 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () =>
+                    Navigator.of(context).pop(false), // Indicate cancel
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),

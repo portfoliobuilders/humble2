@@ -1,8 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:humble/view/user/login.dart';
-import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:provider/provider.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:humble/view/user/user_login.dart';
+import 'package:humble/provider/user_providers.dart';
 
 class RegisterPage extends StatefulWidget {
   @override
@@ -10,40 +12,182 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  Future<Map<String, dynamic>> createUser(Map<String, dynamic> userData) async {
-    final url = Uri.parse('https://ukproject-dx1c.onrender.com/api/user/userregister');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(userData),
-    );
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to create user');
-    }
-  }
-
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _secondNameController = TextEditingController();
-  final _phoneNumberController = TextEditingController();
-  final bool _rememberMe = false;
-  DateTime? _selectedDate;
-  String _selectedCountryCode = "+91"; // Default country code for India
-  String _selectedFlag = '🇮🇳'; // Default flag for India
+  
+  String _phoneNumber = '';
+  String _countryCode = 'GB';
+  bool _obscurePassword = true;
+  bool _isLoading = false;
+
+  void _showErrorSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Colors.white,
+              size: 24,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.red.shade500,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        margin: EdgeInsets.all(16),
+        duration: Duration(seconds: 5),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              color: Colors.white,
+              size: 24,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green.shade500,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        margin: EdgeInsets.all(16),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // In _handleGoogleSignIn method of RegisterPage
+Future<void> _handleGoogleSignIn() async {
+  setState(() {
+    _isLoading = true;
+  });
+  
+  try {
+    print('Starting Google sign-in process');
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    
+    if (googleUser == null) {
+      print('Google sign-in was canceled by user');
+      _showErrorSnackBar(context, 'Google sign-in cancelled.');
+      return;
+    }
+    
+    print('Google user signed in: ${googleUser.email}');
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final String? googleToken = googleAuth.idToken;
+    
+    if (googleToken == null) {
+      print('Failed to obtain Google token');
+      _showErrorSnackBar(context, 'Failed to authenticate with Google.');
+      return;
+    }
+    
+    print('Google token obtained: ${googleToken.substring(0, 10)}...');
+    
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final success = await userProvider.registerWithGoogleProvider(googleToken);
+    
+    print('Registration result: $success');
+    
+    if (success) {
+      _showSuccessSnackBar(context, 'Google registration successful!');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => SignInPage()),
+      );
+    } else {
+      _showErrorSnackBar(context, 'Google registration failed. Please try again.');
+    }
+  } catch (e) {
+    print('Detailed Google sign-in error: $e');
+    if (e is PlatformException) {
+      String errorMessage = 'Google sign-in error (${e.code})';
+      if (e.code == '10') {
+        errorMessage += ': Developer Error. Check SHA-1 fingerprint and package name in Google Cloud Console.';
+      } else if (e.code == 'sign_in_failed') {
+        errorMessage += ': ${e.message ?? 'Unknown sign-in failure'}. Verify app configuration.';
+      } else if (e.code == 'network_error') {
+        errorMessage += ': Network connectivity issue. Please check your internet connection.';
+      } else {
+        errorMessage += ': ${e.message ?? 'Unknown error'}';
+      }
+      _showErrorSnackBar(context, errorMessage);
+    } else {
+      _showErrorSnackBar(context, 'Error signing in with Google: $e');
+    }
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
+
+  Future<void> _handleFacebookSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Implement Facebook sign-in logic here
+      // This is a placeholder for Facebook authentication implementation
+      
+      _showErrorSnackBar(context, 'Facebook login not implemented yet.');
+    } catch (e) {
+      _showErrorSnackBar(context, 'Error signing in with Facebook: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
-          // Top portion with reduced height
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.black, Colors.grey[900]!], // Gradient background
+                colors: [
+                  Colors.black,
+                  Colors.grey[900]!
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -53,15 +197,15 @@ class _RegisterPageState extends State<RegisterPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Image.asset(
-                  'assets/logo.png', // Replace with your logo asset path
-                  height: 50.0, // Adjust logo size
+                  'assets/logo.png',
+                  height: 50.0,
                 ),
                 const SizedBox(height: 20.0),
                 const Text(
                   'Register',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 38.0, // Larger font for prominence
+                    fontSize: 38.0,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -85,10 +229,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: const Text(
                         'Login?',
                         style: TextStyle(
-                          color: Color.fromARGB(179, 14, 105, 209),
+                          color: Colors.blue,
                           fontSize: 16.0,
                           fontWeight: FontWeight.bold,
                           decoration: TextDecoration.underline,
+                          decorationColor: Colors.blue,
+                          height: 1.5,
                         ),
                       ),
                     ),
@@ -97,7 +243,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ],
             ),
           ),
-          // Bottom portion with white background
           Expanded(
             child: Container(
               color: Colors.white,
@@ -106,177 +251,236 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 32.0),
+                    const SizedBox(height: 5.0),
                     Row(
                       children: [
                         Expanded(
-                          child: TextField(
-                            controller: _firstNameController,
-                            decoration: InputDecoration(
-                              hintText: 'First Name',
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                                borderSide: BorderSide.none,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+                                child: Text("First Name"),
                               ),
-                            ),
+                              const SizedBox(height: 5.0),
+                              TextField(
+                                controller: _firstNameController,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 232, 232, 232),
+                                        width: 1),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 232, 232, 232),
+                                        width: 1),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 232, 232, 232),
+                                        width: 1.5),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 16.0),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: TextField(
-                            controller: _secondNameController,
-                            decoration: InputDecoration(
-                              hintText: 'Second Name',
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                                borderSide: BorderSide.none,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+                                child: Text("Last Name"),
                               ),
-                            ),
+                              const SizedBox(height: 5.0),
+                              TextField(
+                                controller: _secondNameController,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 232, 232, 232),
+                                        width: 1),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 232, 232, 232),
+                                        width: 1),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.0),
+                                    borderSide: const BorderSide(
+                                        color: Color.fromARGB(255, 232, 232, 232),
+                                        width: 1.5),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: 10.0),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+                      child: Text("Email"),
+                    ),
+                    const SizedBox(height: 5.0),
                     TextField(
                       controller: _emailController,
                       decoration: InputDecoration(
-                        hintText: 'Email',
-                        filled: true,
-                        fillColor: Colors.grey[200],
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
-                          borderSide: BorderSide.none,
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1.5),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16.0),
-                    GestureDetector(
-                      onTap: () async {
-                        DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(1900),
-                          lastDate: DateTime.now(),
-                        );
+                    const SizedBox(height: 10.0),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+                      child: Text("Phone Number"),
+                    ),
+                    const SizedBox(height: 5.0),
+                    IntlPhoneField(
+                      flagsButtonPadding: const EdgeInsets.all(8),
+                      dropdownIconPosition: IconPosition.trailing,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1.5),
+                        ),
+                      ),
+                      initialCountryCode: 'GB',
+                      onChanged: (phone) {
                         setState(() {
-                          _selectedDate = pickedDate;
+                          _phoneNumber = phone.completeNumber;
+                          _countryCode = phone.countryCode;
                         });
                       },
-                      child: AbsorbPointer(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: _selectedDate == null
-                                ? 'Date of Birth'
-                                : DateFormat('dd-MM-yyyy').format(_selectedDate!),
-                            filled: true,
-                            fillColor: Colors.grey[200],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                              borderSide: BorderSide.none,
-                            ),
-                            suffixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
-                          ),
-                        ),
-                      ),
                     ),
-                    const SizedBox(height: 16.0),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _phoneNumberController,
-                            keyboardType: TextInputType.phone,
-                            decoration: InputDecoration(
-                              hintText: 'Phone Number',
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                                borderSide: BorderSide.none,
-                              ),
-                              prefixIcon: GestureDetector(
-                                onTap: () async {
-                                  // Show a dialog to select country
-                                  final result = await _showCountryPicker();
-                                  if (result != null) {
-                                    setState(() {
-                                      _selectedFlag = result['flag']!;
-                                      _selectedCountryCode = result['code']!;
-                                    });
-                                  }
-                                },
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _selectedFlag,
-                                      style: const TextStyle(fontSize: 17.0),
-                                    ),
-                                    const SizedBox(width: 8.0),
-                                    Text(
-                                      _selectedCountryCode,
-                                      style: const TextStyle(fontSize: 16.0, color: Colors.black),
-                                    ),
-                                    const SizedBox(width: 8.0),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 0.0),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+                      child: Text("Password"),
                     ),
-                    const SizedBox(height: 16.0),
+                    const SizedBox(height: 5.0),
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        hintText: 'Set Password',
-                        filled: true,
-                        fillColor: Colors.grey[200],
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
-                          borderSide: BorderSide.none,
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: const BorderSide(
+                              color: Color.fromARGB(255, 232, 232, 232),
+                              width: 1.5),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: Color.fromARGB(255, 232, 232, 232),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                         ),
                       ),
                     ),
                     const SizedBox(height: 20.0),
                     ElevatedButton(
-                      onPressed: () async {
-                        if (_firstNameController.text.isNotEmpty &&
-                            _secondNameController.text.isNotEmpty &&
-                            _emailController.text.isNotEmpty &&
-                            _phoneNumberController.text.isNotEmpty &&
-                            _passwordController.text.isNotEmpty &&
-                            _selectedDate != null) {
-                          final userData = {
-                            "firstname": _firstNameController.text,
-                            "lastname": _secondNameController.text,
-                            "email": _emailController.text,
-                            "dateOfBirth": DateFormat('yyyy-MM-dd').format(_selectedDate!),
-                            "phoneNumber": _selectedCountryCode + _phoneNumberController.text,
-                            "password": _passwordController.text,
-                          };
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              final email = _emailController.text.trim();
+                              final password = _passwordController.text;
+                              final firstName = _firstNameController.text.trim();
+                              final lastName = _secondNameController.text.trim();
 
-                          try {
-                            final response = await createUser(userData);
-                            print("User registered: $response");
-                            // Navigate to the next page (e.g., Leader page)
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => SignInPage()),
-                            );
-                          } catch (e) {
-                            print('Error registering user: $e');
-                          }
-                        } else {
-                          print('Please fill all the fields');
-                        }
-                      },
+                              if (email.isNotEmpty && 
+                                  password.isNotEmpty && 
+                                  firstName.isNotEmpty && 
+                                  lastName.isNotEmpty && 
+                                  _phoneNumber.isNotEmpty) {
+                                
+                                setState(() {
+                                  _isLoading = true;
+                                });
+                                
+                                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                userProvider.registerProvider(
+                                  email: email,
+                                  password: password,
+                                  name: '$firstName $lastName',
+                                  phoneNumber: _phoneNumber,
+                                ).then((success) {
+                                  setState(() {
+                                    _isLoading = false;
+                                  });
+                                  
+                                  if (success) {
+                                    _showSuccessSnackBar(context, 'Registration successful!');
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => SignInPage()),
+                                    );
+                                  } else {
+                                    _showErrorSnackBar(context, 'Registration failed. Please try again.');
+                                  }
+                                });
+                              } else {
+                                _showErrorSnackBar(context, 'Please fill all fields');
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         minimumSize: const Size.fromHeight(48.0),
@@ -284,12 +488,127 @@ class _RegisterPageState extends State<RegisterPage> {
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                       ),
-                      child: const Text(
-                        'Register',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16.0,
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Register',
+                              style: TextStyle(color: Colors.white, fontSize: 16.0),
+                            ),
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            color: Color.fromARGB(255, 232, 232, 232),
+                            thickness: 1,
+                            indent: 10,
+                            endIndent: 10,
+                          ),
                         ),
+                        const Text(
+                          'Or register with',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: Color.fromARGB(255, 232, 232, 232),
+                            thickness: 1,
+                            indent: 10,
+                            endIndent: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 30.0),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          height: 45,
+                          width: 180,
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _handleGoogleSignIn,
+                            label: const Text(
+                              "Google",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                            icon: Image.asset(
+                              'assets/google.png',
+                              width: 24.0,
+                              height: 24.0,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                  color: Color.fromARGB(255, 232, 232, 232)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor: Colors.transparent,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        SizedBox(
+                          height: 45,
+                          width: 180,
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _handleFacebookSignIn,
+                            label: const Text(
+                              "Facebook",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                            icon: Image.asset(
+                              'assets/facebook.png',
+                              width: 26.0,
+                              height: 26.0,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                  color: Color.fromARGB(255, 232, 232, 232)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor: Colors.transparent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20.0),
+                    Center(
+                      child: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'By registering, you agree to ',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 12.0,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'the Terms of Service and Data Processing Agreement',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 12.0,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
@@ -299,42 +618,6 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Future<Map<String, String>?> _showCountryPicker() async {
-    // Country list
-    final countries = [
-      {'flag': '🇮🇳', 'code': '+91', 'name': 'India'},
-      {'flag': '🇺🇸', 'code': '+1', 'name': 'United States'},
-      {'flag': '🇬🇧', 'code': '+44', 'name': 'United Kingdom'},
-      {'flag': '🇦🇺', 'code': '+61', 'name': 'Australia'},
-      {'flag': '🇨🇦', 'code': '+1', 'name': 'Canada'},
-      {'flag': '🇩🇪', 'code': '+49', 'name': 'Germany'},
-      {'flag': '🇯🇵', 'code': '+81', 'name': 'Japan'},
-    ];
-
-    // Show dialog
-    return showDialog<Map<String, String>>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Select Country'),
-          content: SingleChildScrollView(
-            child: Column(
-              children: countries.map((country) {
-                return ListTile(
-                  leading: Text(country['flag']!),
-                  title: Text(country['name']!),
-                  onTap: () {
-                    Navigator.pop(context, country);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
     );
   }
 }

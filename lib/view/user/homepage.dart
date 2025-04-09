@@ -1,13 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:humble/provider/user_providers.dart';
 import 'package:humble/view/user/checkout.dart';
+import 'package:humble/view/user/notification.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -18,287 +16,610 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? _currentLocationMessage;
-  String? _backSlideLocationMessage;
   double _sliderPosition = 0.0;
-  double _maxWidth = 0.0;
-  bool _isSliderActive = false;
-  Set<int> selectedIndices = {};
-  String currentTime = DateFormat('hh:mm a').format(DateTime.now());
 
-  void _onSlide(double deltaX, double startPosition, double endPosition) {
-    setState(() {
-      _sliderPosition += deltaX;
-      // Clamping slider position within the start and end bounds
-      _sliderPosition = _sliderPosition.clamp(startPosition, endPosition);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      userProvider.fetchUserProfileProvider();
+      userProvider.fetchLocationProvider();
+      userProvider.fetchWorkingHoursProvider(); // Fetch working hours on init
     });
   }
 
-  void _onSlideEnd(double startPosition, double endPosition) {
-    setState(() {
-      if (_sliderPosition > endPosition / 2) {
-        // Lock slider at the end position
-        _sliderPosition = endPosition;
-        _isSliderActive = true;
-        _fetchCurrentLocation();
+  Future<void> _performCheckOut() async {
+    // Direct navigation to ConfirmCheckoutScreen
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ConfirmCheckoutScreen(),
+      ),
+    );
 
-        // Navigate to the next page when the slide is completed
-      } else {
-        // Reset slider to start position
-        _sliderPosition = endPosition;
-        _isSliderActive = false;
-        _fetchBackSlideLocation();
-        _navigateToNextPage();
-      }
-    });
-  }
+    // If checkout was successful (not cancelled)
+    if (result is Map<String, dynamic>) {
+      // Perform checkout through provider using the signature from the result
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      try {
+        await userProvider.checkOutProvider(
+            result['headNurseSignature'], result['headNurseName']);
 
-Future<void> _fetchCurrentLocation() async {
-  try {
-    // Check if location services are enabled
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() {
-        _currentLocationMessage = "Location services are disabled.";
-      });
-      return;
-    }
-
-    // Request permissions if necessary
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+        // Reset slider position
         setState(() {
-          _currentLocationMessage = "Location permission denied.";
+          _sliderPosition = 0.0;
         });
-        return;
+
+        // Refresh working hours after checkout
+        userProvider.fetchWorkingHoursProvider();
+
+        // Show success message
+        _showSuccessSnackBar(
+            'Checkout successful. Total Hours: ${result['totalHoursWorked']}');
+      } catch (e) {
+        // Show error message if checkout fails
+        _showErrorSnackBar('Checkout failed: ${e.toString()}');
       }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      setState(() {
-        _currentLocationMessage =
-            "Location permissions are permanently denied.";
-      });
-      return;
-    }
-
-    // Get current position
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation);
-
-    // For web compatibility, use a fallback if placemarks are not supported
-    String locationDetails = "${position.latitude}, ${position.longitude}";
-
-    try {
-      // Attempt reverse geocoding
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude, position.longitude);
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        locationDetails =
-            "${place.name}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
-      }
-    } catch (geocodingError) {
-      // Handle geocoding error gracefully
-      print("Geocoding failed: $geocodingError");
-    }
-
-    // Add time and update the state
-    String currentTime = DateFormat('hh:mm a').format(DateTime.now());
-    setState(() {
-      _currentLocationMessage = "$locationDetails at $currentTime";
-    });
-
-    // Send the location to your server or handler
-    _sendCheckinCurrentLocation(_currentLocationMessage ?? "Location unavailable");
-  } catch (e) {
-    // Handle other errors
-    setState(() {
-      _currentLocationMessage = "Error fetching location: $e";
-    });
-  }
-}
-
-
-  Future<void> _sendCheckinCurrentLocation(
-      String _currentLocationMessage) async {
-    if (_currentLocationMessage == "empty") {
-      print("_currentLocationMessage is empty");
-      print(_currentLocationMessage);
-    }
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString("userId");
-
-    try {
-      // Extract data from _currentLocationMessage
-      String location =
-          _currentLocationMessage.split(' at ')[0]; // Extracts the location
-      DateTime now = DateTime.now();
-      String startTime = now.toUtc().toIso8601String();
-
-      // API URL
-      final url =
-          Uri.parse('https://ukproject-dx1c.onrender.com/api/user/startWork');
-      print(userId);
-      print(location);
-      print(startTime);
-      // Construct request body
-      final body = json.encode({
-        "userId": userId,
-        "location": location,
-        "startTime": startTime,
-      });
-
-      // Make the POST request
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
-
-      // Handle response
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Response: ${json.decode(response.body)}');
-      } else {
-        print('Error: ${response.body}');
-        throw Exception('Failed to send location data');
-      }
-    } catch (e) {
-      print('Exception: $e');
     }
   }
 
-  Future<void> _fetchBackSlideLocation() async {
+  Future<void> _performCheckIn() async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          _backSlideLocationMessage = "Location services are disabled.";
-        });
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+      // Get the assigned location
+      final assignedLocation = userProvider.location;
+
+      if (assignedLocation == null) {
+        _showErrorSnackBar('No assigned location found');
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            _backSlideLocationMessage = "Location permission denied.";
-          });
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          _backSlideLocationMessage =
-              "Location permissions are permanently denied.";
-        });
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
+      // Get current position
+      Position currentPosition = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.bestForNavigation);
-      List<Placemark> placemarks =
-          await placemarkFromCoordinates(position.latitude, position.longitude);
 
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks[0];
-        String currentTime = DateFormat('hh:mm a').format(DateTime.now());
+      // Calculate distance between current and assigned location
+      double distance = Geolocator.distanceBetween(
+          currentPosition.latitude,
+          currentPosition.longitude,
+          assignedLocation.latitude,
+          assignedLocation.longitude);
+
+      // Check if within 100 meters
+      const double maxAllowedDistance = 100; // meters
+      if (distance <= maxAllowedDistance) {
+        // Perform check-in
+        await userProvider.checkInProvider(
+            currentPosition.latitude, currentPosition.longitude);
+
+        // Refresh working hours after check-in
+        userProvider.fetchWorkingHoursProvider();
+
+        // Get readable location details
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+            currentPosition.latitude, currentPosition.longitude);
+
+        String locationDetails = placemarks.isNotEmpty
+            ? "${placemarks[0].name}, ${placemarks[0].locality}"
+            : "${currentPosition.latitude}, ${currentPosition.longitude}";
+
         setState(() {
-          _backSlideLocationMessage =
-              "${place.name}, ${place.locality}, ${place.administrativeArea}, ${place.country} at $currentTime";
+          _currentLocationMessage =
+              "$locationDetails at ${DateFormat('hh:mm a').format(DateTime.now())}";
         });
+
+        _showSuccessSnackBar('Check-in successful');
+      } else {
+        _showErrorSnackBar('You are not within the allowed check-in radius');
       }
     } catch (e) {
-      setState(() {
-        _backSlideLocationMessage = "Error fetching location: $e";
-      });
+      _showErrorSnackBar('Check-in failed: ${e.toString()}');
     }
   }
 
-  void _navigateToNextPage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ConfirmCheckoutScreen()),
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 24),
-              _buildDateSelector(),
-              const SizedBox(height: 24),
-              _buildAttendanceSection(),
-              const SizedBox(height: 24),
-              _buildActivitySection(),
-              SizedBox(
-                height: 24,
+        child: Column(
+          children: [
+            // Main content
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Container(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 24),
+                      _buildDateSelector(),
+                      const SizedBox(height: 24),
+                      _buildWorkingHoursAndAttendance(),
+                      const SizedBox(height: 24),
+                      _buildActivitySection(),
+                    ],
+                  ),
+                ),
               ),
-              _buildSliderButton(),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: _buildSliderButton(),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildSliderButton() {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final bool isReady = userProvider.isAvailable;
+        final bool isCheckedIn = userProvider.isCheckedIn;
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            double containerWidth = constraints.maxWidth;
+            double startPosition = containerWidth * 0.015;
+            double endPosition = containerWidth * 0.79;
+
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return Container(
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      // Background container
+                      Container(
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: isCheckedIn
+                              ? Colors.red.shade600
+                              : Colors.blue.shade600,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Text(
+                            isCheckedIn
+                                ? 'Slide to Check Out'
+                                : 'Slide to Check In',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Slider
+                      Positioned(
+                        left: _sliderPosition >= startPosition
+                            ? (_sliderPosition <= endPosition
+                                ? _sliderPosition
+                                : endPosition)
+                            : startPosition,
+                        top: 5,
+                        child: GestureDetector(
+                          onHorizontalDragUpdate: (details) {
+                            setState(() {
+                              _sliderPosition += details.primaryDelta ?? 0;
+                              _sliderPosition = _sliderPosition.clamp(
+                                  startPosition, endPosition);
+                            });
+                          },
+                          onHorizontalDragEnd: (_) async {
+                            if (_sliderPosition > endPosition / 2) {
+                              try {
+                                if (isCheckedIn) {
+                                  await _performCheckOut();
+                                } else {
+                                  await _performCheckIn();
+                                }
+                              } catch (e) {
+                                _showErrorSnackBar(
+                                    'Operation failed: ${e.toString()}');
+                              } finally {
+                                setState(() {
+                                  _sliderPosition = startPosition;
+                                });
+                              }
+                            } else {
+                              setState(() {
+                                _sliderPosition = startPosition;
+                              });
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            height: 50,
+                            width: 75,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  isCheckedIn ? Icons.logout : Icons.login,
+                                  color: isCheckedIn
+                                      ? Colors.red.shade600
+                                      : Colors.blue.shade600,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final user = userProvider.userProfile?.user;
+        if (user == null) {
+          return const CircularProgressIndicator();
+        }
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundImage: AssetImage('assets/user (1).png'),
+            Expanded(
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 20,
+                    backgroundImage: AssetImage('assets/user (1).png'),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          'Floor Manager',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Athul Anil',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const NotificationScreen()),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWorkingHoursAndAttendance() {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final location = userProvider.location;
+        final workingHours = userProvider.workingHours;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Today's Attendance",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Left side - Location info
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade100, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Assigned Location',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          location?.name ?? 'Loading...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          location != null
+                              ? '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}'
+                              : 'Fetching location',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                Text(
-                  'Floor Manager',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
+
+                const SizedBox(width: 16),
+
+                // Right side - Total Hours info
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade100, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.access_time, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Total Working Hours',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          workingHours?.totalHoursWorked ?? 'Loading...',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'For This Month',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: const [
+                Expanded(
+                  child: AttendanceCard(
+                    title: 'Break Time',
+                    time: '00:45 min',
+                    subtitle: 'Avg Time',
+                    icon: Icons.timer,
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: AttendanceCard(
+                    title: 'Total Days',
+                    time: '28',
+                    subtitle: 'Working Days',
+                    icon: Icons.calendar_today,
                   ),
                 ),
               ],
             ),
           ],
-        ),
-        // Row(
-        //   children: [
-        //     Switch(
-        //       value: false,
-        //       onChanged: null,
-        //     ),
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {},
+        );
+      },
+    );
+  }
+
+  Widget _buildActivitySection() {
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        final workSessions = userProvider.workingHours?.workSessions ?? [];
+
+        // Sort work sessions by check-in time (most recent first)
+        if (workSessions.isNotEmpty) {
+          workSessions.sort((a, b) => DateTime.parse(b.checkInTime)
+              .compareTo(DateTime.parse(a.checkInTime)));
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your Activity',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-         // ],
-        // ),
-      ],
+            const SizedBox(height: 8),
+
+            // Only show the most recent activity
+            if (workSessions.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    // Most recent check-in
+                    ActivityItem(
+                      title: 'Check In',
+                      subtitle: 'At ${workSessions[0].locationName}',
+                      time: DateFormat('hh:mm a')
+                          .format(DateTime.parse(workSessions[0].checkInTime)),
+                      status: 'On Time',
+                      icon: Icons.login,
+                    ),
+
+                    // Most recent check-out (if exists)
+                    if (workSessions[0].checkOutTime != null)
+                      ActivityItem(
+                        title: 'Check Out',
+                        subtitle: 'At ${workSessions[0].locationName}',
+                        time: DateFormat('hh:mm a').format(
+                            DateTime.parse(workSessions[0].checkOutTime!)),
+                        status: 'Hours: ${workSessions[0].hoursWorked}',
+                        icon: Icons.logout,
+                      ),
+                  ],
+                ),
+              ),
+            ] else if (userProvider.isCheckedIn) ...[
+              // Current check-in if no historical sessions
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    ActivityItem(
+                      title: 'Check In',
+                      subtitle: 'Today',
+                      time: DateFormat('hh:mm a')
+                          .format(userProvider.checkInTime ?? DateTime.now()),
+                      status: 'On Time',
+                      icon: Icons.login,
+                    ),
+                    if (_currentLocationMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _currentLocationMessage!,
+                                style: const TextStyle(
+                                    color: Colors.black, fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // No activities to show
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    'No recent activity',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -320,204 +641,13 @@ Future<void> _fetchCurrentLocation() async {
     );
   }
 
-  Widget _buildAttendanceSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Today's Attendance",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-      Row(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-    AttendanceCard(
-      title: 'Current time',
-      time: currentTime,
-      subtitle: '',
-      icon: Icons.time_to_leave,
-    ),
-     // Spacer between the card and total hours
-   
-  ],
-),
-
-        const SizedBox(height: 16),
-        Row(
-          children: const [
-            Expanded(
-              child: AttendanceCard(
-                title: 'Break Time',
-                time: '00:45 min',
-                subtitle: 'Avg Time',
-                icon: Icons.timer,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: AttendanceCard(
-                title: 'Total Days',
-                time: '28',
-                subtitle: 'Working Days',
-                icon: Icons.calendar_today,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActivitySection() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Your Activity',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              TextButton(
-                onPressed: () {},
-                child: const Text('View All'),
-              ),
-            ],
-          ),
-          Column(
-            children: [
-              const ActivityItem(
-                title: 'Check In',
-                subtitle: 'June 2024',
-                time: '05:00 am',
-                status: 'On Time',
-                icon: Icons.login,
-              ),
-            ],
-          ),
-          SizedBox(
-            height: 5,
-          ),
-          Row(
-            children: [
-              const Icon(Icons.add_location_alt_outlined),
-              Text(
-                _currentLocationMessage ?? 'Check In Location.',
-                style: const TextStyle(color: Colors.black, fontSize: 14),
-              ),
-            ],
-          ),
-          SizedBox(
-            height: 5,
-          ),
-          const ActivityItem(
-            title: 'Check Out',
-            subtitle: 'June 2024',
-            time: '05:00 pm',
-            status: 'On Time',
-            icon: Icons.logout,
-          ),
-          SizedBox(
-            height: 5,
-          ),
-          // Row(
-          //   children: [
-          //     const Icon(Icons.add_location_alt_outlined),
-          //     Text(
-          //       _backSlideLocationMessage ?? 'Check Out Location.',
-          //       style: const TextStyle(color: Colors.black, fontSize: 14),
-          //     ),
-          //   ],
-          // ),
-          SizedBox(height: 30,)
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSliderButton() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        double containerWidth = constraints.maxWidth - 100;
-        double startPosition = containerWidth * 0.02;
-        double endPosition = containerWidth * 0.98;
-
-        Color containerColor = _sliderPosition >= endPosition
-            ? const Color.fromARGB(255, 255, 66, 66)
-            : Colors.blue;
-
-        String containerText = _sliderPosition >= endPosition
-            ? 'Slide to Check Out'
-            : 'Slide to Check In';
-
-        return Stack(
-          children: [
-            Container(
-              height: 60,
-              decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Text(
-                  containerText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: _sliderPosition >= startPosition
-                  ? (_sliderPosition <= endPosition
-                      ? _sliderPosition
-                      : endPosition)
-                  : startPosition,
-              top: 5,
-              child: GestureDetector(
-                onHorizontalDragUpdate: (details) {
-                  _onSlide(
-                      details.primaryDelta ?? 0, startPosition, endPosition);
-                },
-                onHorizontalDragEnd: (_) {
-                  _onSlideEnd(startPosition, endPosition);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  height: 50,
-                  width: 100,
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 255, 255, 255),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    _isSliderActive ? 'Check Out' : 'Check In',
-                    style: const TextStyle(
-                        color: Color.fromARGB(255, 0, 0, 0),
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   String _getWeekDay(int index) {
     const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return weekDays[index % 7];
   }
 }
 
-class DateItem extends StatefulWidget {
+class DateItem extends StatelessWidget {
   final String day;
   final String weekDay;
   final bool isSelected;
@@ -530,34 +660,29 @@ class DateItem extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<DateItem> createState() => _DateItemState();
-}
-
-class _DateItemState extends State<DateItem> {
-  @override
   Widget build(BuildContext context) {
     return Container(
       width: 60,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: widget.isSelected ? Colors.blue : Colors.transparent,
+        color: isSelected ? Colors.blue : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            widget.day,
+            day,
             style: TextStyle(
-              color: widget.isSelected ? Colors.white : Colors.black,
+              color: isSelected ? Colors.white : Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            widget.weekDay,
+            weekDay,
             style: TextStyle(
-              color: widget.isSelected ? Colors.white : Colors.grey,
+              color: isSelected ? Colors.white : Colors.grey,
               fontSize: 12,
             ),
           ),
@@ -596,10 +721,13 @@ class AttendanceCard extends StatelessWidget {
             children: [
               Icon(icon, color: Colors.blue),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.grey,
+              Flexible(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -672,6 +800,7 @@ class ActivityItem extends StatelessWidget {
                     color: Colors.grey.shade600,
                     fontSize: 12,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
