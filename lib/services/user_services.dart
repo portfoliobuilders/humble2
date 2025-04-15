@@ -182,7 +182,7 @@ class UserApi {
   }
 
   Future<http.Response> checkOutAPI(
-      String token, String headNurseSignature, String headNurseName) async {
+      String token, String headNurseSignature, String headNurseName, String latitude, String longitude) async {
     final url = Uri.parse('$baseUrl/student/checkOut');
     try {
       print('Check-Out Request');
@@ -194,7 +194,9 @@ class UserApi {
         },
         body: jsonEncode({
           "headNurseSignature": headNurseSignature,
-          "headNurseName": headNurseName
+          "headNurseName": headNurseName,
+          "latitude":latitude,
+          "longitude":longitude
         }),
       );
       print('Status Code: ${response.statusCode}');

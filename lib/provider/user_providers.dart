@@ -406,12 +406,12 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> checkOutProvider(
-      String headNurseSignature, String headNurseName) async {
+  Future<Map<String, dynamic>> checkOutProvider(String headNurseSignature,
+      String headNurseName, String latitude, String longitude) async {
     if (_token == null) throw Exception('Token is missing');
     try {
       final response = await _apiService.checkOutAPI(
-          _token!, headNurseSignature, headNurseName);
+          _token!, headNurseSignature, headNurseName, latitude, longitude);
       final responseBody = json.decode(response.body);
       if (response.statusCode == 200 && responseBody['success'] == true) {
         final checkOutTime = DateTime.now();

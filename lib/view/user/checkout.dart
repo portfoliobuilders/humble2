@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:humble/view/user/ConfirmCheckoutScreen.dart';
 import 'package:provider/provider.dart';
 import 'package:humble/provider/user_providers.dart';
@@ -36,52 +37,56 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
   }
 
   Future<void> _performCheckout() async {
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
+  try {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-      // Check if form is valid
-      if (!_formKey.currentState!.validate()) {
-        return;
-      }
+    // Check if form is valid
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      // Check if signature is drawn
-      if (_signaturePoints.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please provide a signature before proceeding.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Convert signature to string
-      String headNurseSignature = _signatureToString();
-
-      // Perform checkout using provider with head nurse name
-      final result = await userProvider.checkOutProvider(
-          headNurseSignature, _headNurseNameController.text);
-
-      // Navigate to Confirmcheckout screen with checkout details
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => Confirmcheckout(
-            nurseInChargeName: _nameController.text,
-            headNurseSignature: headNurseSignature,
-            totalHoursWorked: result['totalHoursWorked'],
-          ),
-        ),
-      );
-    } catch (e) {
-      // Show error message
+    // Check if signature is drawn
+    if (_signaturePoints.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Checkout failed: ${e.toString()}'),
+        const SnackBar(
+          content: Text('Please provide a signature before proceeding.'),
           backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+
+    // Convert signature to string
+    String headNurseSignature = _signatureToString();
+    
+    // Get current position for checkout
+    Position currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation);
+    
+    // Perform checkout using provider with all required parameters
+    final result = await userProvider.checkOutProvider(
+      headNurseSignature, 
+      _headNurseNameController.text,
+      currentPosition.latitude.toString(),
+      currentPosition.longitude.toString(),
+    );
+
+    // Return result to previous screen
+    Navigator.of(context).pop({
+      'headNurseSignature': headNurseSignature,
+      'headNurseName': _headNurseNameController.text,
+      'totalHoursWorked': result['totalHoursWorked'],
+    });
+  } catch (e) {
+    // Show error message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Checkout failed: ${e.toString()}'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

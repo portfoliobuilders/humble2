@@ -42,8 +42,16 @@ class _HomeScreenState extends State<HomeScreen> {
       // Perform checkout through provider using the signature from the result
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       try {
+        // Get current position for checkout location
+        Position currentPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.bestForNavigation);
+
         await userProvider.checkOutProvider(
-            result['headNurseSignature'], result['headNurseName']);
+          result['headNurseSignature'],
+          result['headNurseName'],
+          currentPosition.latitude.toString(), // Add latitude
+          currentPosition.longitude.toString(), // Add longitude
+        );
 
         // Reset slider position
         setState(() {

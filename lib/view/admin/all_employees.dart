@@ -475,13 +475,13 @@ class EmployeeListItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      role,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 16,
-                      ),
-                    ),
+                    // Text(
+                    //   role,
+                    //   style: TextStyle(
+                    //     color: Colors.grey[600],
+                    //     fontSize: 16,
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
