@@ -173,79 +173,161 @@ class AdminApi {
   }
 
   Future<http.Response> deleteLocationAPI(
-  String token,
-  String locationId,
-) async {
-  final url = Uri.parse('$baseUrl/admin/deleteLocation/$locationId'); 
-  try {
-    final response = await http.delete(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-    return response;
-  } catch (e) {
-    print('Error deleting location: $e');
-    rethrow;
+    String token,
+    String locationId,
+  ) async {
+    final url = Uri.parse('$baseUrl/admin/deleteLocation/$locationId');
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return response;
+    } catch (e) {
+      print('Error deleting location: $e');
+      rethrow;
+    }
   }
-}
 
-
-
-Future<http.Response> assignLocationAPI(
-  String token,
-  String studentId,
-  String locationId,
-  List<String> assignedDates,
-) async {
-  final url = Uri.parse('$baseUrl/admin/assignLocation'); 
-  try {
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'studentId': studentId,
-        'locationId': locationId,
-        'assignedDates': assignedDates,
-      }),
-    );
-    return response;
-  } catch (e) {
-    print('Error marking student location: $e');
-    rethrow;
+  Future<http.Response> assignLocationAPI(
+    String token,
+    String studentId,
+    String locationId,
+    List<String> assignedDates,
+  ) async {
+    final url = Uri.parse('$baseUrl/admin/assignLocation');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'studentId': studentId,
+          'locationId': locationId,
+          'assignedDates': assignedDates,
+        }),
+      );
+      return response;
+    } catch (e) {
+      print('Error marking student location: $e');
+      rethrow;
+    }
   }
-}
 
-Future<http.Response> proposeDatesAPI(
-  String token,
-  String userId,
-  List<String> proposedDates,
-) async {
-  final url = Uri.parse('$baseUrl/admin/assignWorkdates');
-  try {
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'userId': userId,
-        'proposedDates': proposedDates,
-      }),
-    );
-    return response;
-  } catch (e) {
-    print('Error proposing dates: $e');
-    rethrow;
+  Future<http.Response> proposeDatesAPI(
+    String token,
+    String userId,
+    List<String> proposedDates,
+  ) async {
+    final url = Uri.parse('$baseUrl/admin/assignWorkdates');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'userId': userId,
+          'proposedDates': proposedDates,
+        }),
+      );
+      return response;
+    } catch (e) {
+      print('Error proposing dates: $e');
+      rethrow;
+    }
   }
-}
 
+  Future<http.Response> fetchAssignedDatesAPI(
+      String token, String userId) async {
+    final url = Uri.parse(
+        '$baseUrl/admin/getAssignedDates/$userId'); // Adjust path if needed
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return response;
+    } catch (e) {
+      print('Error in fetchAssignedDatesAPI: $e');
+      rethrow;
+    }
+  }
+    Future<http.Response> sendForgotPasswordEmail({
+    required String email,
+  }) async {
+    final url = Uri.parse('$baseUrl/forgotPassword');
 
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
 
+  Future<http.Response> ForgotPasswordAPI({
+    required String otp,
+    required String password,
+  }) async {
+    final url = Uri.parse('$baseUrl/resetpassword');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'otp': otp,
+          'password': password,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<http.Response> changePasswordAPI({
+    required String token,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final url = Uri.parse('$baseUrl/changePassword');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

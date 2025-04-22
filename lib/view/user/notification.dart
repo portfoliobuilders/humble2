@@ -11,13 +11,11 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  // Track which notifications are expanded
   Map<int, bool> expandedNotifications = {};
-  
+
   @override
   void initState() {
     super.initState();
-    // Fetch proposed dates when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UserProvider>(context, listen: false).fetchProposedDatesProvider();
     });
@@ -31,8 +29,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final proposedDatesProvider = Provider.of<UserProvider>(context);
-    
+    final userProvider = Provider.of<UserProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notification'),
@@ -42,11 +40,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
         centerTitle: true,
       ),
-      body: proposedDatesProvider.isLoading
+      body: userProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-               
                 ExpandableNotificationTile(
                   title: 'Proposed Dates Available',
                   message: 'Tap to view proposed dates for your appointment',
@@ -55,7 +52,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   iconColor: Colors.purple,
                   isExpanded: expandedNotifications[0] ?? false,
                   onTap: () => toggleExpanded(0),
-                  expandedContent: proposedDatesProvider.proposedDates.isEmpty
+                  expandedContent: userProvider.proposedDates.isEmpty
                       ? const Center(child: Text('No proposed dates available'))
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,21 +67,110 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 ),
                               ),
                             ),
-                            ...proposedDatesProvider.proposedDates.map((date) {
+                            ...userProvider.proposedDates.map((date) {
+                              final formattedDate = DateFormat('yyyy-MM-dd').format(date);
                               return Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(
-                                      Icons.event,
-                                      size: 16,
-                                      color: Colors.purple,
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.event,
+                                          size: 16,
+                                          color: Colors.purple,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          DateFormat('EEEE, MMM dd, yyyy').format(date),
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      DateFormat('EEEE, MMM dd, yyyy').format(date),
-                                      style: const TextStyle(fontSize: 14),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              try {
+                                                await userProvider.respondToRequest([
+                                                  {
+                                                    "date": formattedDate,
+                                                    "action": "accept",
+                                                  }
+                                                ]);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Date accepted successfully'),
+                                                      backgroundColor: Colors.green,
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text('Failed to accept date: $e'),
+                                                      backgroundColor: Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.green,
+                                            ),
+                                            child: const Text(
+                                              'Accept',
+                                              style: TextStyle(color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              try {
+                                                await userProvider.respondToRequest([
+                                                  {
+                                                    "date": formattedDate,
+                                                    "action": "reject",
+                                                  }
+                                                ]);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Date rejected successfully'),
+                                                      backgroundColor: Colors.orange,
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text('Failed to reject date: $e'),
+                                                      backgroundColor: Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            child: const Text(
+                                              'Reject',
+                                              style: TextStyle(color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                    const Divider(),
                                   ],
                                 ),
                               );
@@ -275,7 +361,7 @@ class ExpandableNotificationTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (isExpanded) 
+            if (isExpanded)
               Padding(
                 padding: const EdgeInsets.only(left: 56, top: 12, bottom: 4),
                 child: expandedContent,

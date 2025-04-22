@@ -194,3 +194,42 @@ class Location {
     };
   }
 }
+class AssignedDatesResponse {
+  final bool success;
+  final String message;
+  final String userId;
+  final String userName;
+  final String assignedLocation;
+  final List<String> assignedDates;
+
+  AssignedDatesResponse({
+    required this.success,
+    required this.message,
+    required this.userId,
+    required this.userName,
+    required this.assignedLocation,
+    required this.assignedDates,
+  });
+
+  factory AssignedDatesResponse.fromJson(Map<String, dynamic> json) {
+    return AssignedDatesResponse(
+      success: json['success'],
+      message: json['message'],
+      userId: json['userId'],
+      userName: json['userName'],
+      assignedLocation: json['assignedLocation'],
+      assignedDates: List<String>.from(json['assignedDates']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'success': success,
+      'message': message,
+      'userId': userId,
+      'userName': userName,
+      'assignedLocation': assignedLocation,
+      'assignedDates': assignedDates,
+    };
+  }
+}

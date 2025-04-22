@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:humble/provider/user_providers.dart';
 import 'package:humble/view/admin/admin_login.dart';
+import 'package:humble/view/user/forget_password.dart';
 import 'package:provider/provider.dart';
 import 'package:humble/view/user/register.dart';
 import 'package:humble/view/user/bottom.dart';
@@ -192,7 +193,11 @@ class _SignInPageState extends State<SignInPage> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
-                          
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const ForgotPasswordScreen()),
+                          );
                         },
                         child: const Text(
                           'Forgot Password?',

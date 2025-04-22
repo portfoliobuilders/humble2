@@ -1,5 +1,30 @@
 {
   "dependencies": {
-    "gh-pages": "^6.2.0"
-  }
+    "gh-pages": "^6.2.0",
+    "serve": "^14.2.4"
+  },
+  "name": "humble2",
+  "version": "1.0.0",
+  "description": "A new Flutter project.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "serve -s build/web"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/portfoliobuilders/humble2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/portfoliobuilders/humble2/issues"
+  },
+  "homepage": "https://github.com/portfoliobuilders/humble2#readme"
 }

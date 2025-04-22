@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:humble/provider/admin_providers.dart';
+import 'package:humble/view/admin/forget_password.dart';
 import 'package:humble/view/user/user_login.dart';
 import 'package:provider/provider.dart';
 
@@ -165,7 +166,11 @@ class _AdminLoginState extends State<AdminLogin> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
-                          // Forgot password functionality
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const AdminForgotPasswordScreen()),
+                          );
                         },
                         child: const Text(
                           'Forgot Password?',

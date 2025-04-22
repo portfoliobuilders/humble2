@@ -181,8 +181,8 @@ class UserApi {
     }
   }
 
-  Future<http.Response> checkOutAPI(
-      String token, String headNurseSignature, String headNurseName, String latitude, String longitude) async {
+  Future<http.Response> checkOutAPI(String token, String headNurseSignature,
+      String headNurseName, String latitude, String longitude) async {
     final url = Uri.parse('$baseUrl/student/checkOut');
     try {
       print('Check-Out Request');
@@ -195,8 +195,8 @@ class UserApi {
         body: jsonEncode({
           "headNurseSignature": headNurseSignature,
           "headNurseName": headNurseName,
-          "latitude":latitude,
-          "longitude":longitude
+          "latitude": latitude,
+          "longitude": longitude
         }),
       );
       print('Status Code: ${response.statusCode}');
@@ -326,8 +326,12 @@ class UserApi {
     }
   }
 
-  Future<http.Response> postAcceptAPI(String token, String endpoint) async {
+  Future<http.Response> sendDateResponsesAPI({
+    required String token,
+    required List<Map<String, String>> responses,
+  }) async {
     final url = Uri.parse('$baseUrl/student/respond');
+
     try {
       final response = await http.post(
         url,
@@ -336,10 +340,78 @@ class UserApi {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          "accept": "true",
+          "responses": responses,
         }),
       );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
 
+  Future<http.Response> sendForgotPasswordEmail({
+    required String email,
+  }) async {
+    final url = Uri.parse('$baseUrl/forgotPassword');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<http.Response> ForgotPasswordAPI({
+    required String otp,
+    required String password,
+  }) async {
+    final url = Uri.parse('$baseUrl/resetpassword');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'otp': otp,
+          'password': password,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<http.Response> changePasswordAPI({
+    required String token,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final url = Uri.parse('$baseUrl/changePassword');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        }),
+      );
       return response;
     } catch (e) {
       rethrow;

@@ -25,48 +25,77 @@ class _HomeScreenState extends State<HomeScreen> {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       userProvider.fetchUserProfileProvider();
       userProvider.fetchLocationProvider();
-      userProvider.fetchWorkingHoursProvider(); // Fetch working hours on init
+      userProvider.fetchWorkingHoursProvider();
     });
   }
 
+  Future<Position> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+
+    // When we reach here, permissions are granted and we can continue accessing the position
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium);
+  }
+
   Future<void> _performCheckOut() async {
-    // Direct navigation to ConfirmCheckoutScreen
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const ConfirmCheckoutScreen(),
       ),
     );
 
-    // If checkout was successful (not cancelled)
     if (result is Map<String, dynamic>) {
-      // Perform checkout through provider using the signature from the result
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       try {
-        // Get current position for checkout location
-        Position currentPosition = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.bestForNavigation);
+        Position currentPosition = await _determinePosition();
 
         await userProvider.checkOutProvider(
           result['headNurseSignature'],
           result['headNurseName'],
-          currentPosition.latitude.toString(), // Add latitude
-          currentPosition.longitude.toString(), // Add longitude
+          currentPosition.latitude.toString(),
+          currentPosition.longitude.toString(),
         );
 
-        // Reset slider position
         setState(() {
           _sliderPosition = 0.0;
         });
 
-        // Refresh working hours after checkout
         userProvider.fetchWorkingHoursProvider();
 
-        // Show success message
         _showSuccessSnackBar(
             'Checkout successful. Total Hours: ${result['totalHoursWorked']}');
       } catch (e) {
-        // Show error message if checkout fails
-        _showErrorSnackBar('Checkout failed: ${e.toString()}');
+        String errorMessage;
+        if (e.toString().contains('denied')) {
+          errorMessage =
+              'Please enable location permissions in your browser settings to check out.';
+        } else if (e.toString().contains('disabled')) {
+          errorMessage =
+              'Please enable location services on your device to check out.';
+        } else {
+          errorMessage = 'Checkout failed: ${e.toString()}';
+        }
+        _showErrorSnackBar(errorMessage);
       }
     }
   }
@@ -83,9 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Get current position
-      Position currentPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.bestForNavigation);
+      // Get current position using the new method
+      Position currentPosition = await _determinePosition();
 
       // Calculate distance between current and assigned location
       double distance = Geolocator.distanceBetween(
@@ -122,7 +150,17 @@ class _HomeScreenState extends State<HomeScreen> {
         _showErrorSnackBar('You are not within the allowed check-in radius');
       }
     } catch (e) {
-      _showErrorSnackBar('Check-in failed: ${e.toString()}');
+      String errorMessage;
+      if (e.toString().contains('denied')) {
+        errorMessage =
+            'Please enable location permissions in your browser settings to check in.';
+      } else if (e.toString().contains('disabled')) {
+        errorMessage =
+            'Please enable location services on your device to check in.';
+      } else {
+        errorMessage = 'Error accessing location: ${e.toString()}';
+      }
+      _showErrorSnackBar(errorMessage);
     }
   }
 
@@ -164,8 +202,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 24),
-                      _buildDateSelector(),
-                      const SizedBox(height: 24),
+                      // _buildDateSelector(),
+                      // const SizedBox(height: 24),
                       _buildWorkingHoursAndAttendance(),
                       const SizedBox(height: 24),
                       _buildActivitySection(),

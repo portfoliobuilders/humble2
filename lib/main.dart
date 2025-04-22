@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:humble/provider/user_providers.dart';
-import 'package:humble/view/user/splash_screen.dart';
+import 'package:humble/splash_screen.dart';
 import 'package:provider/provider.dart';
 
 void main() {

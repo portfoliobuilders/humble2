@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:humble/constants/token.dart';
 import 'package:humble/model/user_models.dart';
@@ -26,6 +28,7 @@ class UserProvider with ChangeNotifier {
   List<String> _readyToWorkDates = [];
   ReadyToWorkResponse? _readyToWorkData;
   List<DateTime> _proposedDates = [];
+  String? _message;
 
   UserProfile? get userProfile => _userProfile;
   String? get token => _token;
@@ -42,9 +45,9 @@ class UserProvider with ChangeNotifier {
   List<String> get readyToWorkDates => _readyToWorkDates;
   ReadyToWorkResponse? get readyToWorkData => _readyToWorkData;
   List<DateTime> get proposedDates => _proposedDates;
+  String? get message => _message;
 
   String formatDateTime(DateTime dateTime) {
-    // Convert to local timezone before formatting
     final localDateTime = dateTime.toLocal();
     return DateFormat('hh:mm a').format(localDateTime);
   }
@@ -606,15 +609,20 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<void> respondToRequestProvider() async {
+  Future<void> respondToRequest(List<Map<String, String>> responses) async {
     if (_token == null) throw Exception('Token is missing');
+
     try {
-      final response = await _apiService.postAcceptAPI(_token!, 'respond');
+      final response = await _apiService.sendDateResponsesAPI(
+        token: _token!,
+        responses: responses,
+      );
+
       final responseBody = json.decode(response.body);
 
       if (response.statusCode == 200 && responseBody['success'] == true) {
-        // Optionally update any local state if needed
-        print('Response accepted successfully');
+        print('Responses submitted successfully');
+        // Update state or UI if needed
         notifyListeners();
       } else {
         print('Failed to respond: ${response.body}');
@@ -623,6 +631,115 @@ class UserProvider with ChangeNotifier {
     } catch (e) {
       print('Error responding to the request: $e');
       rethrow;
+    }
+  }
+
+  Future<void> sendForgotPasswordEmailProvider(String email) async {
+    _isLoading = true;
+    _message = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.sendForgotPasswordEmail(email: email);
+      final responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['success'] == true) {
+        _message = responseBody['message'];
+        print('OTP sent successfully');
+      } else {
+        _message = responseBody['message'] ?? 'Something went wrong';
+        print('Failed to send OTP: ${response.body}');
+        throw Exception('Failed to send forgot password email');
+      }
+    } catch (e) {
+      _message = 'Error: $e';
+      print(_message);
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> ForgotPasswordProvider({
+    required String otp,
+    required String password,
+  }) async {
+    _isLoading = true;
+    _message = null;
+    notifyListeners();
+    try {
+      final response = await _apiService.ForgotPasswordAPI(
+        otp: otp,
+        password: password,
+      );
+
+      // First check if we got HTML
+      if (response.body.trim().startsWith('<!DOCTYPE html>')) {
+        _message = 'Server error. Please try again later.';
+        print('API returned HTML instead of JSON');
+        throw Exception('API returned HTML instead of JSON');
+      }
+
+      // If it's not HTML, try to parse as JSON
+      try {
+        final responseBody = json.decode(response.body);
+        // Assuming your API returns a success flag and message
+        if (response.statusCode == 200) {
+          _message = responseBody['message'] ?? 'Password reset successfully';
+          print('Password reset successfully: $_message');
+        } else {
+          _message = responseBody['message'] ?? 'Failed to reset password';
+          print('Failed to reset password: $_message');
+          throw Exception(_message);
+        }
+      } catch (parseError) {
+        // If JSON parsing fails
+        print('Error parsing JSON: $parseError');
+        _message = 'Invalid response from server';
+        throw Exception('Invalid response from server');
+      }
+    } catch (e) {
+      print('Error in ForgotPasswordProvider: $e');
+      if (_message == null) {
+        _message = 'Error: $e';
+      }
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> changePasswordProvider({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    _message = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.changePasswordAPI(
+        token: _token!,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+
+      final responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['success'] == true) {
+        _message = responseBody['message'];
+      } else {
+        _message = responseBody['message'] ?? 'Something went wrong';
+        throw Exception('Failed to change password');
+      }
+    } catch (e) {
+      _message = 'Error: $e';
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

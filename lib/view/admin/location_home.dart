@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:humble/model/admin_model.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:humble/view/admin/add_location.dart';
+import 'package:humble/view/admin/available_employees.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -26,6 +27,28 @@ class _WorkSitesHomeState extends State<WorkSitesHome> {
 
   String getFormattedDate(DateTime date) {
     return DateFormat('MMM d, yyyy').format(date);
+  }
+
+  void _navigateToAddSite(BuildContext context,
+      {Map<String, dynamic>? arguments}) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AddEditLocationScreen(
+          locationId: arguments?['locationId'],
+          initialName: arguments?['initialName'],
+          initialLatitude: arguments?['initialLatitude'],
+          initialLongitude: arguments?['initialLongitude'],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToAssignWorkers(BuildContext context, String locationId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AvailableEmployees(locationId: locationId),
+      ),
+    );
   }
 
   @override
@@ -80,7 +103,7 @@ class _WorkSitesHomeState extends State<WorkSitesHome> {
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        // icon: Icon(Icons.add),
+                        icon: Icon(Icons.add),
                         label: Text('Add Site', style: TextStyle(fontSize: 16)),
                         style: ElevatedButton.styleFrom(
                           foregroundColor: Colors.white,
@@ -91,7 +114,7 @@ class _WorkSitesHomeState extends State<WorkSitesHome> {
                           ),
                         ),
                         onPressed: () {
-                          Navigator.of(context).pushNamed('/add-site');
+                          _navigateToAddSite(context);
                         },
                       ),
                     ),
@@ -107,110 +130,138 @@ class _WorkSitesHomeState extends State<WorkSitesHome> {
 
   Widget _buildWorkSiteCard(Location location) {
     final String locationId = location.locationId ?? '';
-    final String status = 'Available'; // Replace with dynamic status if needed
 
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 10),
+      margin: EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    location.name,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left side - Image
+              ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+                child: Image.asset(
+                  'assets/workimage.jpg',
+                  width: 120,
+                  height: 150,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              // Right side - Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0, vertical: 4.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        location.name,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+
+                      // Location name with icon
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, color: Colors.blue, size: 20),
+                          SizedBox(width: 4),
+                          Text(
+                            'Padamughal',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Coordinates
+                      Padding(
+                        padding: const EdgeInsets.only(left: 2.0),
+                        child: Text(
+                          '${location.latitude.toStringAsFixed(4)},${location.longitude.toStringAsFixed(4)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(height: 12),
+
+                      // Assign Employee button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _navigateToAssignWorkers(context, locationId);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.blue,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: Text(
+                            'Assign Employee',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: status == 'Available' ? Colors.green : Colors.orange,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            // Address
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.location_on, color: Colors.black54, size: 22),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Your address will go here',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Icon(Icons.people, color: Colors.black54, size: 22),
-                SizedBox(width: 8),
-                Text(
-                  getFormattedCoordinates(
-                      location.latitude, location.longitude),
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Spacer(),
-                IconButton(
-                  icon: const ImageIcon(
-                    AssetImage('assets/Create.png'),
-                    size: 28,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pushNamed(
-                      '/add-site',
-                      arguments: {
-                        'locationId': locationId,
-                        'initialName': location.name,
-                        'initialLatitude': location.latitude.toString(),
-                        'initialLongitude': location.longitude.toString(),
-                      },
-                    );
+              ),
+            ],
+          ),
+          SizedBox(
+            height: 5,
+          ),
+          Container(
+            width: double.infinity,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.only(bottom: 12.0, top: 4.0),
+            child: TextButton(
+              onPressed: () {
+                _navigateToAddSite(
+                  context,
+                  arguments: {
+                    'locationId': locationId,
+                    'initialName': location.name,
+                    'initialLatitude': location.latitude.toString(),
+                    'initialLongitude': location.longitude.toString(),
                   },
-                )
-              ],
-            ),
-            SizedBox(height: 8),
-            // Assign Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                child: Text(
-                  'Assign Workers',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+                );
+              },
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Edit location details',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontSize: 14,
                 ),
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.blue,
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.of(context)
-                      .pushNamed('/assign', arguments: locationId);
-                },
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

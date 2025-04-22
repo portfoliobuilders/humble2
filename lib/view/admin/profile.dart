@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:humble/provider/user_providers.dart';
+import 'package:humble/provider/admin_providers.dart';
+import 'package:humble/view/admin/admin_login.dart';
+import 'package:humble/view/admin/change_password.dart';
+
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -26,7 +29,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       backgroundColor: const Color(0xFF2196F3),
       bottomNavigationBar: SizedBox(height: 0), // Force extension to bottom
       body: SafeArea(
-        child: Consumer<UserProvider>(
+        child: Consumer<AdminProvider>(
           builder: (context, userProvider, child) {
             return Stack(
               children: [
@@ -69,7 +72,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           physics: AlwaysScrollableScrollPhysics(),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              minHeight: MediaQuery.of(context).size.height - 150,
+                              minHeight:
+                                  MediaQuery.of(context).size.height - 150,
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.max,
@@ -96,8 +100,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                 // Contact Section
                                 _buildSectionHeader('CONTACT'),
                                 Container(
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 16),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16),
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[100],
@@ -105,13 +109,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                   ),
                                   child: Column(
                                     children: [
-                                      _buildContactItem(Icons.email, dummyUser['email']),
-                                      const SizedBox(height: 16),
                                       _buildContactItem(
-                                          Icons.phone, dummyUser['phoneNumber']),
+                                          Icons.email, dummyUser['email']),
                                       const SizedBox(height: 16),
-                                      _buildContactItem(
-                                          Icons.location_on, dummyUser['address']),
+                                      _buildContactItem(Icons.phone,
+                                          dummyUser['phoneNumber']),
+                                      const SizedBox(height: 16),
+                                      _buildContactItem(Icons.location_on,
+                                          dummyUser['address']),
                                     ],
                                   ),
                                 ),
@@ -120,8 +125,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                 const SizedBox(height: 24),
                                 _buildSectionHeader('ACCOUNT'),
                                 Container(
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 16),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[100],
                                     borderRadius: BorderRadius.circular(16),
@@ -138,21 +143,35 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                         context,
                                         Icons.lock_outline,
                                         'Change Password',
-                                        () {},
+                                        () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const AdminChangePasswordScreen()),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
                                 ),
 
-                                // Logout Button
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 30),
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      // Only keep the logout provider functionality
-                                      final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                      final userProvider =
+                                          Provider.of<AdminProvider>(context,
+                                              listen: false);
+
                                       userProvider.logoutProvider(context);
+
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) => AdminLogin()),
+                                      );
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF2196F3),
@@ -173,7 +192,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                   ),
                                 ),
 
-                                // Add some bottom padding for better scrolling experience
                                 SizedBox(height: 20),
                               ],
                             ),

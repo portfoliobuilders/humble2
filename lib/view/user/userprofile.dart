@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:humble/provider/user_providers.dart';
+import 'package:humble/view/user/change_password.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -87,7 +88,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           physics: AlwaysScrollableScrollPhysics(),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              minHeight: MediaQuery.of(context).size.height - 150,
+                              minHeight:
+                                  MediaQuery.of(context).size.height - 150,
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.max,
@@ -114,8 +116,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 // Contact Section
                                 _buildSectionHeader('CONTACT'),
                                 Container(
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 16),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16),
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[100],
@@ -123,7 +125,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   ),
                                   child: Column(
                                     children: [
-                                      _buildContactItem(Icons.email, user.email),
+                                      _buildContactItem(
+                                          Icons.email, user.email),
                                       const SizedBox(height: 16),
                                       _buildContactItem(
                                           Icons.phone, user.phoneNumber),
@@ -138,8 +141,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 const SizedBox(height: 24),
                                 _buildSectionHeader('ACCOUNT'),
                                 Container(
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 16),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16),
                                   decoration: BoxDecoration(
                                     color: Colors.grey[100],
                                     borderRadius: BorderRadius.circular(16),
@@ -156,13 +159,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                         context,
                                         Icons.lock_outline,
                                         'Change Password',
-                                        () {},
+                                        () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const ChangePasswordScreen()),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
                                 ),
 
-                                // Logout Button
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 30),

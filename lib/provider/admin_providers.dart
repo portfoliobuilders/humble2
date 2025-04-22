@@ -15,6 +15,8 @@ class AdminProvider with ChangeNotifier {
   bool _isLoading = false;
   List<ReadyToWorkUser> _readyToWorkUsers = [];
   List<Location> _locations = [];
+  AssignedDatesResponse? _assignedDatesResponse;
+  String? _message;
 
   String? get token => _token;
   Data? get data => _data;
@@ -22,6 +24,8 @@ class AdminProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   List<ReadyToWorkUser> get readyToWorkUsers => _readyToWorkUsers;
   List<Location> get locations => _locations;
+  AssignedDatesResponse? get assignedDatesResponse => _assignedDatesResponse;
+  String? get message => _message;
 
   Future<void> loginProvider(
     String email,
@@ -114,39 +118,28 @@ class AdminProvider with ChangeNotifier {
       String? token = await getToken();
       if (token != null) {
         final response = await _apiService.userLogoutAPI(token);
-        print('Logout Status Code: ${response.statusCode}');
-        print('Logout Response Body: ${response.body}');
+
         if (response.statusCode == 200) {
-          print('Logout successful');
           // Clear token from local storage
           await clearToken();
+
+          // Clear authentication state
+          _token = null;
+          notifyListeners(); // This will trigger the Consumer to rebuild and show login
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Logged out successfully.')),
           );
-          // Navigate to Login Screen
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => AdminLogin()),
-            (route) => false,
-          );
-          notifyListeners();
         } else {
-          print('Logout failed: ${response.body}');
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Logout failed. Please try again.',
-              ),
-            ),
+            const SnackBar(content: Text('Logout failed. Please try again.')),
           );
         }
       }
     } catch (e) {
       print('Logout Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('An error occurred during logout.'),
-        ),
+        const SnackBar(content: Text('An error occurred during logout.')),
       );
     }
   }
@@ -512,6 +505,172 @@ class AdminProvider with ChangeNotifier {
     } catch (e) {
       print('Error proposing dates: $e');
       rethrow;
+    }
+  }
+
+  Future<bool> fetchAssignedDatesProvider(String userId) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      if (_token == null) {
+        _token = await getToken();
+      }
+
+      if (_token != null) {
+        final response =
+            await _apiService.fetchAssignedDatesAPI(_token!, userId);
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> responseBody = jsonDecode(response.body);
+
+          if (responseBody['success'] == true) {
+            try {
+              _assignedDatesResponse =
+                  AssignedDatesResponse.fromJson(responseBody);
+              print(
+                  'Fetched Assigned Dates: ${_assignedDatesResponse?.assignedDates.length}');
+              _isLoading = false;
+              notifyListeners();
+              return true;
+            } catch (parseError) {
+              print('Error parsing assigned dates: $parseError');
+              _isLoading = false;
+              notifyListeners();
+              return false;
+            }
+          } else {
+            print(
+                'Fetch failed: ${responseBody['message'] ?? 'Unknown error'}');
+            _isLoading = false;
+            notifyListeners();
+            return false;
+          }
+        } else {
+          print('Fetch failed with status: ${response.statusCode}');
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      print('Error fetching assigned dates: $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> sendForgotPasswordEmailProvider(String email) async {
+    _isLoading = true;
+    _message = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.sendForgotPasswordEmail(email: email);
+      final responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['success'] == true) {
+        _message = responseBody['message'];
+        print('OTP sent successfully');
+      } else {
+        _message = responseBody['message'] ?? 'Something went wrong';
+        print('Failed to send OTP: ${response.body}');
+        throw Exception('Failed to send forgot password email');
+      }
+    } catch (e) {
+      _message = 'Error: $e';
+      print(_message);
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> ForgotPasswordProvider({
+    required String otp,
+    required String password,
+  }) async {
+    _isLoading = true;
+    _message = null;
+    notifyListeners();
+    try {
+      final response = await _apiService.ForgotPasswordAPI(
+        otp: otp,
+        password: password,
+      );
+
+      // First check if we got HTML
+      if (response.body.trim().startsWith('<!DOCTYPE html>')) {
+        _message = 'Server error. Please try again later.';
+        print('API returned HTML instead of JSON');
+        throw Exception('API returned HTML instead of JSON');
+      }
+
+      // If it's not HTML, try to parse as JSON
+      try {
+        final responseBody = json.decode(response.body);
+        // Assuming your API returns a success flag and message
+        if (response.statusCode == 200) {
+          _message = responseBody['message'] ?? 'Password reset successfully';
+          print('Password reset successfully: $_message');
+        } else {
+          _message = responseBody['message'] ?? 'Failed to reset password';
+          print('Failed to reset password: $_message');
+          throw Exception(_message);
+        }
+      } catch (parseError) {
+        // If JSON parsing fails
+        print('Error parsing JSON: $parseError');
+        _message = 'Invalid response from server';
+        throw Exception('Invalid response from server');
+      }
+    } catch (e) {
+      print('Error in ForgotPasswordProvider: $e');
+      if (_message == null) {
+        _message = 'Error: $e';
+      }
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> changePasswordProvider({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    _message = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.changePasswordAPI(
+        token: _token!,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+
+      final responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['success'] == true) {
+        _message = responseBody['message'];
+      } else {
+        _message = responseBody['message'] ?? 'Something went wrong';
+        throw Exception('Failed to change password');
+      }
+    } catch (e) {
+      _message = 'Error: $e';
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }
