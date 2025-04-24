@@ -194,31 +194,58 @@ class Location {
     };
   }
 }
+class AssignedDateItem {
+  final String date;
+  final String location;
+
+  AssignedDateItem({
+    required this.date,
+    required this.location,
+  });
+
+  factory AssignedDateItem.fromJson(Map<String, dynamic> json) {
+    return AssignedDateItem(
+      date: json['date'],
+      location: json['location'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date,
+      'location': location,
+    };
+  }
+}
+
 class AssignedDatesResponse {
   final bool success;
   final String message;
   final String userId;
   final String userName;
-  final String assignedLocation;
-  final List<String> assignedDates;
+  final String? assignedLocation; // Making this nullable as it might not always be present
+  final List<AssignedDateItem> assignedDates;
 
   AssignedDatesResponse({
     required this.success,
     required this.message,
     required this.userId,
     required this.userName,
-    required this.assignedLocation,
+    this.assignedLocation,
     required this.assignedDates,
   });
 
   factory AssignedDatesResponse.fromJson(Map<String, dynamic> json) {
     return AssignedDatesResponse(
-      success: json['success'],
-      message: json['message'],
-      userId: json['userId'],
-      userName: json['userName'],
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      userId: json['userId'] ?? '',
+      userName: json['userName'] ?? '',
       assignedLocation: json['assignedLocation'],
-      assignedDates: List<String>.from(json['assignedDates']),
+      assignedDates: (json['assignedDates'] as List?)
+              ?.map((item) => AssignedDateItem.fromJson(item))
+              .toList() ??
+          [],
     );
   }
 
@@ -229,7 +256,17 @@ class AssignedDatesResponse {
       'userId': userId,
       'userName': userName,
       'assignedLocation': assignedLocation,
-      'assignedDates': assignedDates,
+      'assignedDates': assignedDates.map((item) => item.toJson()).toList(),
     };
+  }
+
+  // Helper method to get just the date strings if needed
+  List<String> getDateStrings() {
+    return assignedDates.map((item) => item.date).toList();
+  }
+
+  // Helper method to get just the location strings if needed
+  List<String> getLocationStrings() {
+    return assignedDates.map((item) => item.location).toList();
   }
 }

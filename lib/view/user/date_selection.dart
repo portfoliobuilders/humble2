@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:humble/provider/user_providers.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class ReadyToWorkCalendarScreen extends StatefulWidget {
   const ReadyToWorkCalendarScreen({Key? key}) : super(key: key);
@@ -12,70 +13,35 @@ class ReadyToWorkCalendarScreen extends StatefulWidget {
 }
 
 class _ReadyToWorkCalendarScreenState extends State<ReadyToWorkCalendarScreen> {
-  late final ValueNotifier<List<DateTime>> _selectedDates;
-  late final ValueNotifier<List<DateTime>> _originalDates;
-  DateTime _focusedDay = DateTime.now();
+  late final ValueNotifier<Set<DateTime>> _selectedDates;
+  late final ValueNotifier<Set<DateTime>> _originalDates;
+  DateTime _focusedMonth = DateTime.now();
   bool _isLoading = false;
   bool _hasChanges = false;
-  final List<DateTime> _months = [];
-  late ScrollController _scrollController;
-  late int _initialScrollIndex;
-  final GlobalKey _currentMonthKey = GlobalKey();
+  final DateTime _today = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _selectedDates = ValueNotifier<List<DateTime>>([]);
-    _originalDates = ValueNotifier<List<DateTime>>([]);
-    _scrollController = ScrollController();
-
-    final now = DateTime.now();
-    for (int i = -12; i <= 24; i++) {
-      _months.add(DateTime(now.year, now.month + i, 1));
-    }
-
-    _initialScrollIndex = _months.indexWhere(
-        (month) => month.year == now.year && month.month == now.month);
+    _selectedDates = ValueNotifier<Set<DateTime>>({});
+    _originalDates = ValueNotifier<Set<DateTime>>({});
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchReadyToWorkDates();
-      // Delay scrolling to ensure the ListView is properly rendered
-      Future.delayed(const Duration(milliseconds: 200), _scrollToCurrentMonth);
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // This will help when returning to this screen from navigation
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToCurrentMonth();
+  void _resetChanges() {
+    setState(() {
+      _selectedDates.value = Set.from(_originalDates.value);
+      _hasChanges = false;
     });
-  }
-
-  void _scrollToCurrentMonth() {
-    if (!_scrollController.hasClients) {
-      // If controller isn't attached yet, retry after a short delay
-      Future.delayed(const Duration(milliseconds: 100), _scrollToCurrentMonth);
-      return;
-    }
-
-    // Use more precise calculation for item height
-    final monthHeight = MediaQuery.of(context).size.height * 0.45;
-    
-    if (_initialScrollIndex >= 0) {
-      // Calculate offset considering all previous months
-      final offset = _initialScrollIndex * monthHeight;
-      
-      _scrollController.animateTo(
-        offset,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
+    _showSnackBar('Changes reset');
   }
 
   Future<void> _fetchReadyToWorkDates() async {
+    if (!mounted) return;
+
     try {
       setState(() {
         _isLoading = true;
@@ -85,34 +51,41 @@ class _ReadyToWorkCalendarScreenState extends State<ReadyToWorkCalendarScreen> {
       await provider.fetchReadyToWorkData();
 
       if (provider.readyToWorkDates.isNotEmpty) {
-        final uniqueDates = <DateTime>{};
+        final dates = <DateTime>{};
 
         for (var dateStr in provider.readyToWorkDates) {
-          final date = DateFormat('yyyy-MM-dd').parse(dateStr);
-          if (!uniqueDates.any((d) => isSameDay(d, date))) {
-            uniqueDates.add(date);
+          try {
+            final date = DateFormat('yyyy-MM-dd').parse(dateStr);
+            // Normalize to midnight to ensure proper comparison
+            final normalized = DateTime(date.year, date.month, date.day);
+
+            // Only add dates that are today or in the future
+            final normalizedToday =
+                DateTime(_today.year, _today.month, _today.day);
+            if (!normalized.isBefore(normalizedToday)) {
+              dates.add(normalized);
+            }
+          } catch (e) {
+            debugPrint('Error parsing date: $dateStr - $e');
           }
         }
 
         setState(() {
-          _selectedDates.value = uniqueDates.toList();
-          _originalDates.value = List.from(uniqueDates.toList());
+          _selectedDates.value = dates;
+          _originalDates.value = Set.from(dates);
           _hasChanges = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to fetch availability dates: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar('Failed to fetch availability dates: $e', isError: true);
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -120,492 +93,479 @@ class _ReadyToWorkCalendarScreenState extends State<ReadyToWorkCalendarScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  bool isPastDay(DateTime date) {
+    final normalizedToday = DateTime(_today.year, _today.month, _today.day);
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    return normalizedDate.isBefore(normalizedToday);
+  }
+
   void _checkForChanges() {
-    if (_originalDates.value.length != _selectedDates.value.length) {
-      setState(() {
-        _hasChanges = true;
-      });
-      return;
-    }
-
-    for (var date in _selectedDates.value) {
-      if (!_originalDates.value.any((d) => isSameDay(d, date))) {
-        setState(() {
-          _hasChanges = true;
-        });
-        return;
-      }
-    }
-
-    for (var date in _originalDates.value) {
-      if (!_selectedDates.value.any((d) => isSameDay(d, date))) {
-        setState(() {
-          _hasChanges = true;
-        });
-        return;
-      }
-    }
-
+    final originalSet = Set.from(_originalDates.value);
+    final selectedSet = Set.from(_selectedDates.value);
+    final hasChanges = !originalSet.containsAll(selectedSet) ||
+        !selectedSet.containsAll(originalSet);
     setState(() {
-      _hasChanges = false;
+      _hasChanges = hasChanges;
     });
+  }
+
+  void _toggleDate(DateTime date) {
+    // Don't allow toggling past dates
+    if (isPastDay(date)) return;
+
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final newSelectedDates = Set<DateTime>.from(_selectedDates.value);
+
+    if (newSelectedDates.any((d) => isSameDay(d, normalizedDate))) {
+      newSelectedDates.removeWhere((d) => isSameDay(d, normalizedDate));
+    } else {
+      newSelectedDates.add(normalizedDate);
+    }
+
+    _selectedDates.value = newSelectedDates;
+    _checkForChanges();
+  }
+
+  void _selectMonth(DateTime month, bool selectAll) {
+    final lastDay = DateTime(month.year, month.month + 1, 0).day;
+    final newSelectedDates = Set<DateTime>.from(_selectedDates.value);
+    final normalizedToday = DateTime(_today.year, _today.month, _today.day);
+
+    // First remove all days from this month
+    newSelectedDates.removeWhere(
+        (date) => date.year == month.year && date.month == month.month);
+
+    // Then add all days if selectAll is true (only future days)
+    if (selectAll) {
+      for (int day = 1; day <= lastDay; day++) {
+        final date = DateTime(month.year, month.month, day);
+        if (!date.isBefore(normalizedToday)) {
+          newSelectedDates.add(date);
+        }
+      }
+    }
+
+    _selectedDates.value = newSelectedDates;
+    _checkForChanges();
+  }
+
+  void _goToCurrentMonth() {
+    setState(() {
+      _focusedMonth = DateTime.now();
+    });
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.montserrat(),
+        ),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
   }
 
   @override
   void dispose() {
     _selectedDates.dispose();
     _originalDates.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final bool isFetching = userProvider.isLoading;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: NestedScrollView(
-        headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-          return <Widget>[
-            SliverAppBar(
-              pinned: true,
-              floating: true,
-              elevation: 0,
-              backgroundColor: Colors.white,
-              expandedHeight: 80,
-              automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: true,
-                title: const Text(
-                  'Select Availability',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-              actions: [
-                // Add a "Today" button to quickly jump to current month
-                TextButton(
-                  onPressed: _scrollToCurrentMonth,
-                  child: const Text(
-                    'Today',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ];
-        },
-        body: isFetching && _selectedDates.value.isEmpty
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.blue,
-                ),
-              )
+      body: SafeArea(
+        child: userProvider.isLoading && _selectedDates.value.isEmpty
+            ? Center(child: CircularProgressIndicator(color: Colors.blue))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _buildMonthsCalendar(),
+                  const SizedBox(height: 40),
+                  Center(
+                    child: Text(
+                      'Ready to Work Calendar',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
-                  _buildSaveButton(userProvider),
+
+                  const SizedBox(height: 24),
+                  // Location Center Container
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month_sharp,
+                                color: const Color(0xFF2196F3),
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Select your available dates',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Tap on the dates to select or deselect them.',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildMonthNavigator(),
+                  Expanded(
+                    child: _buildCalendar(),
+                  ),
+                  _buildActionButtons(userProvider), // Use the new method here
                 ],
               ),
       ),
     );
   }
 
-  Widget _buildMonthsCalendar() {
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount: _months.length,
-      padding: const EdgeInsets.only(bottom: 16),
-      itemBuilder: (context, index) {
-        final month = _months[index];
-        // Highlight current month
-        final isCurrentMonth = month.year == DateTime.now().year &&
-            month.month == DateTime.now().month;
-
-        return _buildMonthCalendar(month, isCurrentMonth, index);
-      },
-    );
-  }
-
-  Widget _buildMonthCalendar(DateTime month, bool isCurrentMonth, int index) {
-    // Use a key for the current month to help with scrolling
-    final key = isCurrentMonth ? _currentMonthKey : null;
-    
-    return Container(
-      key: key,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        border: isCurrentMonth
-            ? Border.all(color: Colors.blue.shade50, width: 2)
-            : Border.all(color: Colors.grey.shade300, width: 1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildMonthNavigator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  DateFormat('MMMM yyyy').format(month),
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: isCurrentMonth ? Colors.blue : Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (isCurrentMonth)
-                  const Icon(
-                    Icons.circle,
-                    size: 10,
-                    color: Colors.blue,
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: _buildCalendarGrid(month),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendarGrid(DateTime month) {
-    // Get the first day of the month
-    final firstDayOfMonth = DateTime(month.year, month.month, 1);
-
-    // Get the last day of the month
-    final lastDayOfMonth = DateTime(month.year, month.month + 1, 0);
-
-    // Get the first day of the calendar grid (showing days from previous month)
-    final firstCalendarDay = firstDayOfMonth.subtract(
-      Duration(days: (firstDayOfMonth.weekday - DateTime.monday) % 7),
-    );
-
-    // Calculate number of weeks needed
-    final daysInMonth = lastDayOfMonth.day;
-    final startOffset = (firstDayOfMonth.weekday - DateTime.monday) % 7;
-    final weeksNeeded = ((daysInMonth + startOffset) / 7).ceil();
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Weekday header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: const [
-            _WeekdayLabel("M"),
-            _WeekdayLabel("T"),
-            _WeekdayLabel("W"),
-            _WeekdayLabel("T"),
-            _WeekdayLabel("F"),
-            _WeekdayLabel("S"),
-            _WeekdayLabel("S"),
-          ],
-        ),
-
-        for (int weekIndex = 0; weekIndex < weeksNeeded; weekIndex++)
-          ValueListenableBuilder<List<DateTime>>(
-            valueListenable: _selectedDates,
-            builder: (context, selectedDates, _) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(7, (dayIndex) {
-                  final date = firstCalendarDay.add(
-                    Duration(days: weekIndex * 7 + dayIndex),
-                  );
-
-                  final belongsToCurrentMonth = date.month == month.month;
-
-                  final isSelected =
-                      selectedDates.any((d) => isSameDay(d, date));
-
-                  final prevDaySelected = selectedDates.any(
-                    (d) => isSameDay(d, date.subtract(const Duration(days: 1))),
-                  );
-                  final nextDaySelected = selectedDates.any(
-                    (d) => isSameDay(d, date.add(const Duration(days: 1))),
-                  );
-
-                  final isToday = isSameDay(date, DateTime.now());
-
-                  return _CalendarDay(
-                    date: date,
-                    isCurrentMonth: belongsToCurrentMonth,
-                    isSelected: isSelected,
-                    isPrevDaySelected: prevDaySelected,
-                    isNextDaySelected: nextDaySelected,
-                    isToday: isToday,
-                    onTap: () {
-                      if (belongsToCurrentMonth) {
-                        final updatedSelectedDates =
-                            List<DateTime>.from(selectedDates);
-                        if (isSelected) {
-                          updatedSelectedDates
-                              .removeWhere((d) => isSameDay(d, date));
-                        } else {
-                          updatedSelectedDates.add(date);
-                        }
-                        _selectedDates.value = updatedSelectedDates;
-                        _checkForChanges();
-                      }
-                    },
-                  );
-                }),
-              );
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () {
+              setState(() {
+                _focusedMonth =
+                    DateTime(_focusedMonth.year, _focusedMonth.month - 1, 1);
+              });
             },
           ),
-      ],
-    );
-  }
-
-  Widget _buildSaveButton(UserProvider userProvider) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, -2),
+          Column(
+            children: [
+              Text(
+                DateFormat('MMMM yyyy').format(_focusedMonth),
+                style: GoogleFonts.montserrat(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              TextButton(
+                onPressed: _goToCurrentMonth,
+                child: Text(
+                  'Go to Current Month',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: () {
+              setState(() {
+                _focusedMonth =
+                    DateTime(_focusedMonth.year, _focusedMonth.month + 1, 1);
+              });
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCalendar() {
+    return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: (!_hasChanges || _isLoading || userProvider.isLoading)
-              ? null
-              : () async {
-                  setState(() {
-                    _isLoading = true;
-                  });
-
-                  try {
-                    final provider =
-                        Provider.of<UserProvider>(context, listen: false);
-
-                    final existingDatesStr = provider.readyToWorkDates;
-
-                    final selectedDatesStr = _selectedDates.value
-                        .map((date) => DateFormat('yyyy-MM-dd').format(date))
-                        .toSet() 
-                        .toList();
-
-                    final datesToRemove = existingDatesStr
-                        .where((dateStr) => !selectedDatesStr.contains(dateStr))
-                        .toList();
-
-                    final datesToAdd = selectedDatesStr
-                        .where((dateStr) => !existingDatesStr.contains(dateStr))
-                        .toList();
-
-                    if (datesToRemove.isNotEmpty) {
-                      await provider.editReadyToWorkDates(datesToRemove);
-                    }
-
-                    if (datesToAdd.isNotEmpty) {
-                      await provider.readyToWorkProvider(datesToAdd);
-                    }
-
-                    await provider.fetchReadyToWorkData();
-
-                    _originalDates.value = List.from(_selectedDates.value);
-                    setState(() {
-                      _hasChanges = false;
-                    });
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Availability updated successfully!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to update: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  } finally {
-                    if (mounted) {
-                      setState(() {
-                        _isLoading = false;
-                      });
-                    }
-                  }
-                },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: Colors.blue.withOpacity(0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 2,
-          ),
-          child: _isLoading || userProvider.isLoading
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : Text(
-                  _hasChanges ? 'Save changes' : 'No changes to save',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WeekdayLabel extends StatelessWidget {
-  final String text;
-
-  const _WeekdayLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: Colors.blue[600],
-        ),
-      ),
-    );
-  }
-}
-
-class _CalendarDay extends StatelessWidget {
-  final DateTime date;
-  final bool isCurrentMonth;
-  final bool isSelected;
-  final bool isPrevDaySelected;
-  final bool isNextDaySelected;
-  final bool isToday;
-  final VoidCallback onTap;
-
-  const _CalendarDay({
-    required this.date,
-    required this.isCurrentMonth,
-    required this.isSelected,
-    required this.isPrevDaySelected,
-    required this.isNextDaySelected,
-    required this.isToday,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = isCurrentMonth
-        ? isSelected
-            ? Colors.white 
-            : isToday
-                ? Colors.blue
-                : Colors.black
-        : Colors.grey[400];
-
-    return GestureDetector(
-      onTap: isCurrentMonth ? onTap : null,
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 51,
-            height: 40,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                .map((day) => Expanded(
+                      child: Center(
+                        child: Text(
+                          day,
+                          style: GoogleFonts.montserrat(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          // Calendar grid
+          Expanded(
+            child: ValueListenableBuilder<Set<DateTime>>(
+              valueListenable: _selectedDates,
+              builder: (context, selectedDates, _) {
+                return _buildCalendarGrid(_focusedMonth, selectedDates);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid(DateTime month, Set<DateTime> selectedDates) {
+    // First day of month
+    final firstDay = DateTime(month.year, month.month, 1);
+
+    // Calculate first day to display (previous month days to complete the week)
+    final firstDisplayDay =
+        firstDay.subtract(Duration(days: (firstDay.weekday - 1) % 7));
+
+    // Last day of month
+    final lastDay = DateTime(month.year, month.month + 1, 0);
+
+    // Calculate number of weeks to display
+    final daysToShow = firstDay.weekday - 1 + lastDay.day;
+    final weeksToShow = (daysToShow / 7).ceil();
+
+    // Today normalized to midnight for comparison
+    final normalizedToday = DateTime(_today.year, _today.month, _today.day);
+
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        childAspectRatio: 1.0,
+      ),
+      itemCount: weeksToShow * 7,
+      itemBuilder: (context, index) {
+        final date = firstDisplayDay.add(Duration(days: index));
+        final isCurrentMonth = date.month == month.month;
+        final isSelected = selectedDates.any((d) => isSameDay(d, date));
+        final isToday = isSameDay(date, _today);
+        final isPast = date.isBefore(normalizedToday);
+
+        // Check for adjacent selected dates to create pill effect
+        final prevDate = date.subtract(const Duration(days: 1));
+        final nextDate = date.add(const Duration(days: 1));
+        final isPrevSelected = selectedDates.any((d) => isSameDay(d, prevDate));
+        final isNextSelected = selectedDates.any((d) => isSameDay(d, nextDate));
+
+        // Only consider connections within the same week and month
+        final isConnectedToPrev = isPrevSelected &&
+            prevDate.weekday < date.weekday &&
+            isCurrentMonth &&
+            prevDate.month == date.month;
+        final isConnectedToNext = isNextSelected &&
+            nextDate.weekday > date.weekday &&
+            isCurrentMonth &&
+            nextDate.month == date.month;
+
+        // Determine border radius based on connections
+        BorderRadius borderRadius = BorderRadius.circular(isSelected ? 0 : 8);
+        if (isSelected) {
+          if (isConnectedToPrev && isConnectedToNext) {
+            borderRadius = BorderRadius.zero;
+          } else if (isConnectedToPrev) {
+            borderRadius = const BorderRadius.only(
+              topRight: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            );
+          } else if (isConnectedToNext) {
+            borderRadius = const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              bottomLeft: Radius.circular(12),
+            );
+          } else {
+            borderRadius =
+                BorderRadius.circular(12); // Pill shape when standalone
+          }
+        }
+
+        return GestureDetector(
+          onTap: (isCurrentMonth && !isPast) ? () => _toggleDate(date) : null,
+          child: Container(
+            margin: EdgeInsets.all(isSelected ? 0 : 2),
             decoration: BoxDecoration(
               color: isSelected
                   ? Colors.blue
                   : isToday
                       ? Colors.blue.withOpacity(0.1)
-                      : Colors.transparent,
-
-              borderRadius: isSelected
-                  ? BorderRadius.horizontal(
-                      left: isPrevDaySelected
-                          ? Radius.zero
-                          : const Radius.circular(8),
-                      right: isNextDaySelected
-                          ? Radius.zero
-                          : const Radius.circular(8),
-                    )
-                  : isToday
-                      ? BorderRadius.circular(8)
                       : null,
-
-              boxShadow: isSelected && (isPrevDaySelected || isNextDaySelected)
-                  ? [
-                      BoxShadow(
-                        color: Colors.blue,
-                        spreadRadius: 0,
-                        blurRadius: 0,
-                        offset: Offset(
-                          isPrevDaySelected ? -0.5 : 0,
-                          0,
-                        ),
-                      ),
-                      BoxShadow(
-                        color: Colors.blue,
-                        spreadRadius: 0,
-                        blurRadius: 0,
-                        offset: Offset(
-                          isNextDaySelected ? 0.5 : 0,
-                          0,
-                        ),
-                      ),
-                    ]
+              borderRadius: borderRadius,
+              border: isToday && !isSelected
+                  ? Border.all(color: Colors.blue)
                   : null,
             ),
-            alignment: Alignment.center,
-            child: Text(
-              date.day.toString(),
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                fontWeight:
-                    isSelected || isToday ? FontWeight.w600 : FontWeight.normal,
+            child: Center(
+              child: Text(
+                date.day.toString(),
+                style: GoogleFonts.montserrat(
+                  color: !isCurrentMonth
+                      ? Colors.grey.withOpacity(0.3)
+                      : isPast
+                          ? Colors.grey.withOpacity(0.5)
+                          : isSelected
+                              ? Colors.white
+                              : null,
+                  fontWeight: isSelected || isToday ? FontWeight.bold : null,
+                ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionButtons(UserProvider userProvider) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          // Clear button - only show when changes exist
+          if (_hasChanges)
+            Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: TextButton(
+              onPressed: (_isLoading || userProvider.isLoading)
+                  ? null
+                  : _resetChanges,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                foregroundColor: Colors.blue,
+              ),
+              child: Text(
+                'Clear changes',
+                style: GoogleFonts.montserrat(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          // Save button
+          Container(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: (!_hasChanges || _isLoading || userProvider.isLoading)
+                  ? null
+                  : _saveChanges,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: _isLoading || userProvider.isLoading
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(color: Colors.white),
+                    )
+                  : Text(
+                      _hasChanges ? 'Save changes' : 'No changes to save',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _saveChanges() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final provider = Provider.of<UserProvider>(context, listen: false);
+
+      // Convert selected dates to string format
+      final selectedDatesStr = _selectedDates.value
+          .map((date) => DateFormat('yyyy-MM-dd').format(date))
+          .toList();
+
+      // Get existing dates from provider
+      final existingDatesStr = provider.readyToWorkDates;
+
+      // Calculate dates to add and remove
+      final datesToRemove = existingDatesStr
+          .where((dateStr) => !selectedDatesStr.contains(dateStr))
+          .toList();
+
+      final datesToAdd = selectedDatesStr
+          .where((dateStr) => !existingDatesStr.contains(dateStr))
+          .toList();
+
+      // Apply changes
+      bool hasChangesApplied = false;
+
+      if (datesToRemove.isNotEmpty) {
+        await provider.editReadyToWorkDates(datesToRemove);
+        hasChangesApplied = true;
+      }
+
+      if (datesToAdd.isNotEmpty) {
+        await provider.readyToWorkProvider(datesToAdd);
+        hasChangesApplied = true;
+      }
+
+      if (hasChangesApplied) {
+        // Refresh data
+        await provider.fetchReadyToWorkData();
+
+        // Update local state
+        _originalDates.value = Set.from(_selectedDates.value);
+        setState(() {
+          _hasChanges = false;
+        });
+
+        _showSnackBar('Availability updated successfully!');
+      }
+    } catch (e) {
+      _showSnackBar('Failed to update: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 }

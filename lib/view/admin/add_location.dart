@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:provider/provider.dart';
 
@@ -86,7 +87,7 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
         backgroundColor: Colors.white,
         title: Text(
           isEditing ? 'Edit Site' : 'Add Site',
-          style: const TextStyle(
+          style: GoogleFonts.montserrat(
               color: Colors.black, fontSize: 32, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -98,7 +99,7 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
           children: [
             Text(
               isEditing ? 'Edit Site Details' : 'Add New Site',
-              style: const TextStyle(
+              style: GoogleFonts.montserrat(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -125,7 +126,7 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
               ),
               child: Text(
                 isEditing ? 'Update Site' : 'Add Site',
-                style: const TextStyle(fontSize: 16),
+                style: GoogleFonts.montserrat(fontSize: 16),
               ),
             ),
             const SizedBox(height: 16),
@@ -148,18 +149,18 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                             Text(
                               'Delete Site',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 16),
-                            const Text(
+                             Text(
                               'Are you sure you want to delete this site?',
-                              style: TextStyle(fontSize: 16),
+                              style: GoogleFonts.montserrat(fontSize: 16),
                             ),
                             const SizedBox(height: 32),
                             Column(
@@ -197,9 +198,9 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: const Text(
+                                  child:  Text(
                                     'Delete Site',
-                                    style: TextStyle(fontSize: 16),
+                                    style: GoogleFonts.montserrat(fontSize: 16),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -212,9 +213,9 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: const Text(
+                                  child:  Text(
                                     'Cancel',
-                                    style: TextStyle(
+                                    style: GoogleFonts.montserrat(
                                       color: Colors.blue,
                                       fontSize: 16,
                                     ),
@@ -229,9 +230,9 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
                   );
                 },
                 icon: const Icon(Icons.delete, color: Colors.red),
-                label: const Text(
+                label:  Text(
                   'Delete site',
-                  style: TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.red,
                     fontSize: 16,
                   ),
@@ -243,7 +244,8 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
                     side: const BorderSide(color: Colors.red),
                   ),
                 ),
-              )
+              ),
+              SizedBox(height: 50,)
           ],
         ),
       ),
@@ -252,7 +254,7 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
 
   Widget _buildLabel(String text) => Text(
         text,
-        style: const TextStyle(fontSize: 16, color: Colors.black),
+        style: GoogleFonts.montserrat(fontSize: 16, color: Colors.black),
       );
 
   Widget _buildInputField(TextEditingController controller) => Container(
@@ -262,6 +264,7 @@ class _AddEditLocationScreenState extends State<AddEditLocationScreen> {
         ),
         child: TextField(
           controller: controller,
+          style: GoogleFonts.montserrat(),
           decoration: const InputDecoration(
             border: InputBorder.none,
             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),

@@ -3,6 +3,7 @@ import 'package:humble/model/user_models.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:humble/provider/user_providers.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({Key? key}) : super(key: key);
@@ -43,7 +44,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load data: $e'),
+            content: Text(
+              'Failed to load data: $e',
+              style: GoogleFonts.montserrat(),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -76,7 +80,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : _buildContentArea(),
     );
   }
@@ -86,11 +90,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(0, 20, 0, 0),
             child: Text(
               'Attendance Records',
-              style: TextStyle(
+              style: GoogleFonts.montserrat(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
@@ -98,7 +102,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ),
           _buildMonthSelector(),
-         
           Expanded(
             child: RefreshIndicator(
               onRefresh: _loadData,
@@ -134,7 +137,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Text(
               DateFormat('MMMM yyyy').format(_selectedMonth),
-              style: const TextStyle(
+              style: GoogleFonts.montserrat(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -161,9 +164,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     if (userProvider.workingHours == null) {
       return _buildEmptyState(
-        icon: Icons.info_outline,
+        icon: Icons.error_outline,
         message: 'No attendance data available',
-        buttonLabel: 'Refresh',
         onPressed: _loadData,
       );
     }
@@ -197,8 +199,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16.0),
-            border: Border.all(
-                color: Colors.grey.shade200, width: 1.0), // Added border
+            border: Border.all(color: Colors.grey.shade200, width: 1.0),
           ),
           child: IntrinsicHeight(
             child: Row(
@@ -227,7 +228,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           hoursWorked.contains("hour")
                               ? hoursWorked
                               : "$hoursWorked hrs",
-                          style: const TextStyle(
+                          style: GoogleFonts.montserrat(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -250,7 +251,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             Expanded(
                               child: Text(
                                 dateString,
-                                style: const TextStyle(
+                                style: GoogleFonts.montserrat(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -265,7 +266,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               ),
                               child: Text(
                                 session.locationName,
-                                style: TextStyle(
+                                style: GoogleFonts.montserrat(
                                   fontSize: 12,
                                   color: Colors.grey.shade800,
                                 ),
@@ -332,27 +333,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const SizedBox(height: 16),
             Text(
               message,
-              style: TextStyle(
+              style: GoogleFonts.montserrat(
                 fontSize: 16,
                 color: Colors.grey.shade700,
               ),
               textAlign: TextAlign.center,
             ),
-            if (buttonLabel != null && onPressed != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onPressed,
-                icon: const Icon(Icons.refresh),
-                label: Text(buttonLabel),
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ],
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -370,7 +357,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.montserrat(
             fontSize: 12,
             color: Colors.grey.shade600,
           ),
@@ -393,7 +380,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const SizedBox(width: 8),
             Text(
               time,
-              style: TextStyle(
+              style: GoogleFonts.montserrat(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.grey.shade800,

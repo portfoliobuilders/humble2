@@ -53,6 +53,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               content: Text(
                 Provider.of<UserProvider>(context, listen: false).message ??
                     'Password changed successfully!',
+                style: GoogleFonts.montserrat(),
               ),
               backgroundColor: Colors.green,
             ),
@@ -68,6 +69,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               content: Text(
                 Provider.of<UserProvider>(context, listen: false).message ??
                     'Failed to change password.',
+                style: GoogleFonts.montserrat(),
               ),
               backgroundColor: Colors.red,
             ),
@@ -106,9 +108,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Change Password',
-                      style: TextStyle(
+                      style: GoogleFonts.montserrat(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                       ),
@@ -116,55 +118,59 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: 16),
                     Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.security,
-                            color: const Color(0xFF2196F3),
-                            size: 24,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.security,
+                                color: const Color(0xFF2196F3),
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Security Information',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(height: 12),
                           Text(
-                            'Security Information',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                            'Please enter your current password and set a new password to update your account security.',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Please enter your current password and set a new password to update your account security.',
-                        style: GoogleFonts.roboto(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 25),
 
                 // Current Password
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(5, 0, 0, 0),
-                  child: Text("Current Password"),
+                  child: Text(
+                    "Current Password",
+                    style: GoogleFonts.montserrat(),
+                  ),
                 ),
                 const SizedBox(height: 5),
                 TextFormField(
                   controller: _currentPasswordController,
-                  obscureText: _obscureCurrentPassword,
+                  // obscureText: _obscureCurrentPassword,
+                  style: GoogleFonts.montserrat(),
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
@@ -187,6 +193,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         width: 1.5,
                       ),
                     ),
+                    // suffixIcon: IconButton(
+                    //   icon: Icon(
+                    //     _obscureCurrentPassword
+                    //         ? Icons.visibility_off
+                    //         : Icons.visibility,
+                    //     color: Colors.grey[300],
+                    //   ),
+                    //   onPressed: () {
+                    //     setState(() {
+                    //       _obscureCurrentPassword = !_obscureCurrentPassword;
+                    //     });
+                    //   },
+                    // ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -198,14 +217,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
                 const SizedBox(height: 20),
 
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(5, 0, 0, 0),
-                  child: Text("New Password"),
+                  child: Text(
+                    "New Password",
+                    style: GoogleFonts.montserrat(),
+                  ),
                 ),
                 const SizedBox(height: 5),
                 TextFormField(
                   controller: _newPasswordController,
-                  obscureText: _obscureNewPassword,
+                  // obscureText: _obscureNewPassword,
+                  style: GoogleFonts.montserrat(),
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
@@ -228,19 +251,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         width: 1.5,
                       ),
                     ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureNewPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: Colors.grey[300],
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureNewPassword = !_obscureNewPassword;
-                        });
-                      },
-                    ),
+                    // suffixIcon: IconButton(
+                    //   icon: Icon(
+                    //     _obscureNewPassword
+                    //         ? Icons.visibility_off
+                    //         : Icons.visibility,
+                    //     color: Colors.grey[300],
+                    //   ),
+                    //   onPressed: () {
+                    //     setState(() {
+                    //       _obscureNewPassword = !_obscureNewPassword;
+                    //     });
+                    //   },
+                    // ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -256,14 +279,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 const SizedBox(height: 20),
 
                 // Re-enter New Password
-                const Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(5, 0, 0, 0),
-                  child: Text("Re-enter New Password"),
+                  child: Text(
+                    "Re-enter New Password",
+                    style: GoogleFonts.montserrat(),
+                  ),
                 ),
                 const SizedBox(height: 5),
                 TextFormField(
                   controller: _reEnterPasswordController,
                   obscureText: _obscureReEnterPassword,
+                  style: GoogleFonts.montserrat(),
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
@@ -286,6 +313,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         width: 1.5,
                       ),
                     ),
+                    // suffixIcon: IconButton(
+                    //   icon: Icon(
+                    //     _obscureReEnterPassword
+                    //         ? Icons.visibility_off
+                    //         : Icons.visibility,
+                    //     color: Colors.grey[300],
+                    //   ),
+                    //   onPressed: () {
+                    //     setState(() {
+                    //       _obscureReEnterPassword = !_obscureReEnterPassword;
+                    //     });
+                    //   },
+                    // ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -320,9 +360,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             strokeWidth: 3,
                           ),
                         )
-                      : const Text(
+                      : Text(
                           'Change Password',
-                          style: TextStyle(fontSize: 16),
+                          style: GoogleFonts.montserrat(fontSize: 16),
                         ),
                 ),
 
@@ -331,9 +371,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 // Cancel Button
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
+                  child: Text(
                     'Cancel',
-                    style: TextStyle(color: Colors.black),
+                    style: GoogleFonts.montserrat(color: Colors.black),
                   ),
                 ),
               ],

@@ -4,7 +4,8 @@ import 'package:humble/constants/token.dart';
 import 'package:humble/model/admin_model.dart';
 import 'package:humble/services/admin_services.dart';
 import 'package:humble/view/admin/admin_login.dart';
-import 'package:humble/view/admin/adminbottom.dart'; // Changed to match your imports
+import 'package:humble/view/admin/adminbottom.dart';
+import 'package:intl/intl.dart'; // Changed to match your imports
 
 class AdminProvider with ChangeNotifier {
   final AdminApi _apiService = AdminApi();
@@ -16,6 +17,7 @@ class AdminProvider with ChangeNotifier {
   List<ReadyToWorkUser> _readyToWorkUsers = [];
   List<Location> _locations = [];
   AssignedDatesResponse? _assignedDatesResponse;
+  List<DateTime> _assignedDates = [];
   String? _message;
 
   String? get token => _token;
@@ -26,6 +28,7 @@ class AdminProvider with ChangeNotifier {
   List<Location> get locations => _locations;
   AssignedDatesResponse? get assignedDatesResponse => _assignedDatesResponse;
   String? get message => _message;
+  List<DateTime> get assignedDates => _assignedDates;
 
   Future<void> loginProvider(
     String email,
@@ -447,66 +450,86 @@ class AdminProvider with ChangeNotifier {
     }
   }
 
-  Future<void> assignLocationProvider(
-      String studentId, String locationId, List<String> assignedDates) async {
+  Future<void> assignStudentToLocationProvider(
+    String locationId,
+    List<String> studentId,
+    List<String> assignedDates,
+  ) async {
     if (_token == null) throw Exception('Token is missing');
-
     try {
-      final response = await _apiService.assignLocationAPI(
+      // For the API request, use the format that works based on your successful response example
+      final requestBody = {
+        'locationId': locationId,
+        'studentId': studentId,
+        'assignedDates':
+            assignedDates, // Keep as array of strings as shown in your successful example
+      };
+
+      print('Sending request body: ${jsonEncode(requestBody)}');
+
+      final response = await _apiService.assignStudentToLocationAPI(
         _token!,
-        studentId,
         locationId,
+        studentId,
         assignedDates,
       );
 
       print('Full API response: ${response.body}');
 
-      final responseBody = json.decode(response.body);
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Student location marked successfully: ${response.body}');
-        // If you need to refresh data after this, do it here (like fetchAttendanceProvider?)
+        print('Student(s) assigned successfully with body: ${response.body}');
         return;
       }
 
-      print('Failed to mark student location: ${response.body}');
+      // Enhanced error logging
+      print('Failed to assign student(s): ${response.body}');
+      try {
+        final errorBody = jsonDecode(response.body);
+        if (errorBody.containsKey('error')) {
+          print('Error details: ${errorBody['error']}');
+        }
+      } catch (e) {
+        print('Could not parse error response');
+      }
+
       throw Exception(
-          'Failed to mark student location: Server returned ${response.statusCode}');
+          'Failed to assign student(s): Server returned ${response.statusCode}');
     } catch (e) {
-      print('Error marking student location: $e');
+      print('Error assigning student(s): $e');
       rethrow;
     }
   }
 
-  Future<void> proposeDatesProvider(
-      String userId, List<String> proposedDates) async {
-    if (_token == null) throw Exception('Token is missing');
-
-    try {
-      final response = await _apiService.proposeDatesAPI(
-        _token!,
-        userId,
-        proposedDates,
-      );
-
-      print('Full API response: ${response.body}');
-
-      final responseBody = json.decode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Dates proposed successfully: ${response.body}');
-        // If you need to refresh or notify UI after success, do it here.
-        return;
-      }
-
-      print('Failed to propose dates: ${response.body}');
-      throw Exception(
-          'Failed to propose dates: Server returned ${response.statusCode}');
-    } catch (e) {
-      print('Error proposing dates: $e');
-      rethrow;
+  Future<Map<String, dynamic>> proposeDatesProvider(
+  String userId, 
+  List<Map<String, String>> proposedDates
+) async {
+  if (_token == null) throw Exception('Token is missing');
+  
+  try {
+    final response = await _apiService.proposeDatesAPI(
+      _token!,
+      userId,
+      proposedDates,
+    );
+    
+    print('Full API response: ${response.body}');
+    
+    final responseBody = json.decode(response.body);
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      print('Dates proposed successfully: ${response.body}');
+      return responseBody;
     }
+    
+    print('Failed to propose dates: ${response.body}');
+    throw Exception(
+      'Failed to propose dates: Server returned ${response.statusCode}');
+  } catch (e) {
+    print('Error proposing dates: $e');
+    rethrow;
   }
+}
 
   Future<bool> fetchAssignedDatesProvider(String userId) async {
     try {
@@ -518,8 +541,14 @@ class AdminProvider with ChangeNotifier {
       }
 
       if (_token != null) {
+        print('Fetching assigned dates for user ID: $userId');
+
         final response =
             await _apiService.fetchAssignedDatesAPI(_token!, userId);
+
+        // Print the full response for debugging
+        print('Fetch response status: ${response.statusCode}');
+        print('Fetch response body: ${response.body}');
 
         if (response.statusCode == 200) {
           final Map<String, dynamic> responseBody = jsonDecode(response.body);
@@ -530,11 +559,24 @@ class AdminProvider with ChangeNotifier {
                   AssignedDatesResponse.fromJson(responseBody);
               print(
                   'Fetched Assigned Dates: ${_assignedDatesResponse?.assignedDates.length}');
+
+              // Update _assignedDates in the state based on the new model
+              _assignedDates =
+                  _assignedDatesResponse?.assignedDates.map((item) {
+                        // Parse the string date to DateTime
+                        return DateFormat('yyyy-MM-dd').parse(item.date);
+                      }).toList() ??
+                      [];
+
               _isLoading = false;
               notifyListeners();
               return true;
             } catch (parseError) {
               print('Error parsing assigned dates: $parseError');
+              // Print the structure to help debug
+              print('Response structure: ${responseBody.keys}');
+              print(
+                  'Assigned dates structure: ${responseBody['assignedDates']}');
               _isLoading = false;
               notifyListeners();
               return false;
@@ -547,7 +589,15 @@ class AdminProvider with ChangeNotifier {
             return false;
           }
         } else {
+          // Enhanced error logging for non-200 responses
           print('Fetch failed with status: ${response.statusCode}');
+          try {
+            final errorBody = jsonDecode(response.body);
+            print('Error response: $errorBody');
+          } catch (e) {
+            print('Could not parse error response: ${response.body}');
+          }
+
           _isLoading = false;
           notifyListeners();
           return false;
@@ -671,6 +721,76 @@ class AdminProvider with ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> editAssignedLocationProvider(
+    String studentId,
+    String dateToEdit,
+    String newDate,
+    String newLocationId,
+  ) async {
+    if (_token == null) throw Exception('Token is missing');
+
+    try {
+      final response = await _apiService.editAssignedLocationAPI(
+        _token!,
+        studentId,
+        dateToEdit,
+        newDate,
+        newLocationId,
+      );
+
+      print('Full edit assigned location response: ${response.body}');
+
+      final responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print(
+            'Assigned location edited successfully with body: ${response.body}');
+        await fetchAssignedDatesProvider(studentId);
+        return;
+      }
+
+      print('Failed to edit assigned location: ${response.body}');
+      throw Exception(
+          'Failed to edit assigned location: Server returned ${response.statusCode}');
+    } catch (e) {
+      print('Error editing assigned location: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAssignedLocationProvider(
+    String studentId,
+    String dateToDelete,
+  ) async {
+    if (_token == null) throw Exception('Token is missing');
+
+    try {
+      final response = await _apiService.deleteAssignedLocationAPI(
+        _token!,
+        studentId,
+        dateToDelete,
+      );
+
+      print('Full delete assigned location response: ${response.body}');
+
+      final responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print(
+            'Assigned location deleted successfully with body: ${response.body}');
+        await fetchAssignedDatesProvider(studentId);
+        return;
+      }
+
+      print('Failed to delete assigned location: ${response.body}');
+      throw Exception(
+          'Failed to delete assigned location: Server returned ${response.statusCode}');
+    } catch (e) {
+      print('Error deleting assigned location: $e');
+      rethrow;
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:humble/provider/user_providers.dart';
 import 'package:humble/view/admin/admin_login.dart';
 import 'package:humble/view/user/forget_password.dart';
@@ -16,6 +17,7 @@ class _SignInPageState extends State<SignInPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +62,9 @@ class _SignInPageState extends State<SignInPage> {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text(
+                      child: Text(
                         'Login As Admin',
-                        style: TextStyle(
+                        style: GoogleFonts.montserrat(
                           color: Colors.white,
                           fontSize: 14.0,
                         ),
@@ -71,9 +73,9 @@ class _SignInPageState extends State<SignInPage> {
                   ],
                 ),
                 const SizedBox(height: 30.0),
-                const Text(
+                Text(
                   'Sign in to your \nAccount',
-                  style: TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.white,
                     fontSize: 38.0,
                     fontWeight: FontWeight.bold,
@@ -82,20 +84,21 @@ class _SignInPageState extends State<SignInPage> {
                 Row(
                   children: [
                     Text(
-                      'Dont you have an account?',
-                      style: TextStyle(color: Colors.white),
+                      'Don\'t you have an account?',
+                      style: GoogleFonts.montserrat(
+                        color: Colors.white,
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
-                              builder: (context) => RegisterPage()),
+                          MaterialPageRoute(builder: (context) => RegisterPage()),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         "Sign up",
-                        style: TextStyle(
+                        style: GoogleFonts.montserrat(
                           color: Colors.blue,
                           decoration: TextDecoration.underline,
                           decorationColor: Colors.blue,
@@ -119,11 +122,15 @@ class _SignInPageState extends State<SignInPage> {
                     const SizedBox(height: 15.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Email"),
+                      child: Text(
+                        "Email",
+                        style: GoogleFonts.montserrat(),
+                      ),
                     ),
                     const SizedBox(height: 5.0),
                     TextField(
                       controller: _emailController,
+                      style: GoogleFonts.montserrat(),
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
@@ -148,11 +155,14 @@ class _SignInPageState extends State<SignInPage> {
                     const SizedBox(height: 16.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Password"),
+                      child:  Text(
+                        "Password",
+                        style: GoogleFonts.montserrat(),
+                      ),
                     ),
-                    const SizedBox(height: 5.0),
                     TextField(
                       controller: _passwordController,
+                      style: GoogleFonts.montserrat(),
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
@@ -199,30 +209,48 @@ class _SignInPageState extends State<SignInPage> {
                                 builder: (context) => const ForgotPasswordScreen()),
                           );
                         },
-                        child: const Text(
+                        child:  Text(
                           'Forgot Password?',
-                          style: TextStyle(color: Colors.blue),
+                          style: GoogleFonts.montserrat(
+                            color: Colors.blue,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 10.0),
                     ElevatedButton(
-                      onPressed: () {
-                        final email = _emailController.text.trim();
-                        final password = _passwordController.text;
+                      onPressed: _isLoading 
+                          ? null 
+                          : () async {
+                              final email = _emailController.text.trim();
+                              final password = _passwordController.text;
 
-                        if (email.isNotEmpty && password.isNotEmpty) {
-                          // Use Provider to handle login
-                          Provider.of<UserProvider>(context, listen: false)
-                              .loginProvider(email, password, context);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter email and password'),
-                            ),
-                          );
-                        }
-                      },
+                              if (email.isNotEmpty && password.isNotEmpty) {
+                                // Set loading state
+                                setState(() {
+                                  _isLoading = true;
+                                });
+                                
+                                try {
+                                  // Use Provider to handle login
+                                  await Provider.of<UserProvider>(context, listen: false)
+                                      .loginProvider(email, password, context);
+                                } finally {
+                                  // Ensure we reset loading state even if there's an error
+                                  if (mounted) {
+                                    setState(() {
+                                      _isLoading = false;
+                                    });
+                                  }
+                                }
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please enter email and password'),
+                                  ),
+                                );
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         minimumSize: const Size.fromHeight(48.0),
@@ -230,10 +258,22 @@ class _SignInPageState extends State<SignInPage> {
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                       ),
-                      child: const Text(
-                        'Log In',
-                        style: TextStyle(color: Colors.white, fontSize: 16.0),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.0,
+                              ),
+                            )
+                          : Text(
+                              'Log In',
+                              style: GoogleFonts.montserrat(
+                                color: Colors.white,
+                                fontSize: 16.0,
+                              ),
+                            ),
                     ),
                     SizedBox(height: 20),
                     Row(
@@ -246,13 +286,13 @@ class _SignInPageState extends State<SignInPage> {
                             endIndent: 10,
                           ),
                         ),
-                        const Text(
-                          'Or login with',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
+                       Text(
+                            'Or login with',
+                            style: GoogleFonts.montserrat(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
                         Expanded(
                           child: Divider(
                             color: Color.fromARGB(255, 232, 232, 232),
@@ -274,9 +314,11 @@ class _SignInPageState extends State<SignInPage> {
                             onPressed: () {
                               // Google login functionality
                             },
-                            label: const Text(
+                            label: Text(
                               "Google",
-                              style: TextStyle(color: Colors.black),
+                              style: GoogleFonts.montserrat(
+                                color: Colors.black,
+                              ),
                             ),
                             icon: Image.asset(
                               'assets/google.png',
@@ -301,9 +343,11 @@ class _SignInPageState extends State<SignInPage> {
                             onPressed: () {
                               // Facebook login functionality
                             },
-                            label: const Text(
+                            label: Text(
                               "Facebook",
-                              style: TextStyle(color: Colors.black),
+                              style: GoogleFonts.montserrat(
+                                color: Colors.black,
+                              ),
                             ),
                             icon: Image.asset(
                               'assets/facebook.png',
@@ -329,16 +373,15 @@ class _SignInPageState extends State<SignInPage> {
                           children: [
                             TextSpan(
                               text: 'By signing up, you agree to ',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.normal,
                               ),
                             ),
                             TextSpan(
-                              text:
-                                  'the Terms of Service and Data Processing Agreement',
-                              style: TextStyle(
+                              text: 'the Terms of Service and Data Processing Agreement',
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.bold,

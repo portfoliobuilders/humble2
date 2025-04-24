@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:humble/view/user/bottom.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class Confirmcheckout extends StatefulWidget {
   final String nurseInChargeName;
@@ -53,30 +54,33 @@ class _ConfirmcheckoutState extends State<Confirmcheckout> {
                 children: [
                   Image.asset('assets/confirm.png', height: 150, width: 150),
                   const SizedBox(height: 30),
-                  const Text(
+                  Text(
                     'Checkout Successful!',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.montserrat(
+                      fontSize: 22, 
+                      fontWeight: FontWeight.bold
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Text(
                     'Nurse In-Charge: ${widget.nurseInChargeName}',
-                    style: const TextStyle(fontSize: 14),
+                    style: GoogleFonts.montserrat(fontSize: 14,fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   Text(
                     'Total Hours Worked: ${widget.totalHoursWorked}',
-                    style: const TextStyle(fontSize: 14),
+                    style: GoogleFonts.montserrat(fontSize: 14,fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'You’ve officially clocked out for the day.',
-                    style: TextStyle(fontSize: 14),
+                  Text(
+                    'You\'ve officially clocked out for the day.',
+                    style: GoogleFonts.montserrat(fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
-                  const Text(
+                  Text(
                     'Thank you for your hard work! Time to relax and enjoy your break.',
-                    style: TextStyle(fontSize: 14),
+                    style: GoogleFonts.montserrat(fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
@@ -98,9 +102,12 @@ class _ConfirmcheckoutState extends State<Confirmcheckout> {
                       ),
                       minimumSize: const Size(350, 50),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Return to Home',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
+                      style: GoogleFonts.montserrat(
+                        fontSize: 16, 
+                        color: Colors.white
+                      ),
                     ),
                   ),
                   const SizedBox(height: 50),

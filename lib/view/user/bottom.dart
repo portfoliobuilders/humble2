@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:humble/view/user/attendance.dart';
 import 'package:humble/view/user/date_selection.dart';
@@ -39,9 +40,12 @@ class _BottomNavigationScreenState extends State<BottomNavigationScreen> {
         now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
       _lastBackPressTime = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Press back again to exit'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(
+            'Press back again to exit',
+            style: GoogleFonts.montserrat(),
+          ),
+          duration: const Duration(seconds: 2),
         ),
       );
       return false; // Don't exit the app
@@ -77,22 +81,42 @@ class _BottomNavigationScreenState extends State<BottomNavigationScreen> {
                   duration: Duration(milliseconds: 300),
                   tabBackgroundColor: Colors.blue.shade300,
                   color: Colors.black,
+                  textStyle: GoogleFonts.montserrat(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
                   tabs: [
                     GButton(
                       icon: Icons.home_outlined,
                       text: 'Home',
+                      textStyle: GoogleFonts.montserrat(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     GButton(
-                      icon: Icons.people_outline,
-                      text: 'Employees',
+                      icon: Icons.assignment_outlined,
+                      text: 'Attendance',
+                      textStyle: GoogleFonts.montserrat(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     GButton(
-                      icon: Icons.location_on_outlined,
-                      text: 'Locations',
+                      icon: Icons.calendar_month,
+                      text: 'My Shedule',
+                      textStyle: GoogleFonts.montserrat(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     GButton(
                       icon: Icons.person_outline,
                       text: 'Profile',
+                      textStyle: GoogleFonts.montserrat(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                   selectedIndex: _selectedIndex,

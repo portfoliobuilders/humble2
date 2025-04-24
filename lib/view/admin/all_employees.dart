@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:humble/model/admin_model.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:provider/provider.dart';
@@ -37,7 +38,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       await userProvider.fetchUsersProvider();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading users: $e')),
+        SnackBar(content: Text('Error loading users: $e', style: GoogleFonts.montserrat())),
       );
     }
   }
@@ -68,8 +69,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Employees',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+        title: Text('Employees',
+            style: GoogleFonts.montserrat(fontSize: 32, fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -114,7 +115,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   ),
                   labelColor: Colors.black,
                   unselectedLabelColor: const Color(0xFF6B88A9),
-                  labelStyle: const TextStyle(
+                  labelStyle: GoogleFonts.montserrat(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -139,10 +140,11 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          decoration: const InputDecoration(
+                          style: GoogleFonts.montserrat(),
+                          decoration: InputDecoration(
                             hintText: 'Search',
                             border: InputBorder.none,
-                            hintStyle: TextStyle(color: Colors.grey),
+                            hintStyle: GoogleFonts.montserrat(color: Colors.grey),
                           ),
                         ),
                       ),
@@ -168,7 +170,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                             child: Text(
                               _searchQuery.isEmpty 
                                 ? 'No approved users found' 
-                                : 'No results for "$_searchQuery"'
+                                : 'No results for "$_searchQuery"',
+                              style: GoogleFonts.montserrat(),
                             )
                           )
                         : ListView.builder(
@@ -196,7 +199,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                             child: Text(
                               _searchQuery.isEmpty 
                                 ? 'No pending requests' 
-                                : 'No results for "$_searchQuery"'
+                                : 'No results for "$_searchQuery"',
+                              style: GoogleFonts.montserrat(),
                             )
                           )
                         : ListView.builder(
@@ -210,20 +214,22 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                   try {
                                     await provider.approveActionProvider(user.userId);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('User approved successfully')),
+                                      SnackBar(content: Text('User approved successfully', 
+                                        style: GoogleFonts.montserrat())),
                                     );
                                   } catch (e) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to approve user: $e')),
+                                      SnackBar(content: Text('Failed to approve user: $e', 
+                                        style: GoogleFonts.montserrat())),
                                     );
                                   }
                                 },
                                 onReject: () {
                                   // Implement reject functionality
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content:
-                                            Text('Reject functionality not implemented yet')),
+                                    SnackBar(
+                                        content: Text('Reject functionality not implemented yet',
+                                          style: GoogleFonts.montserrat())),
                                   );
                                 },
                               );
@@ -240,7 +246,6 @@ class _UserManagementScreenState extends State<UserManagementScreen>
   }
 }
 
-// The rest of the code remains the same
 class RequestListItem extends StatelessWidget {
   final AllUsers user;
   final VoidCallback onAccept;
@@ -294,7 +299,7 @@ class RequestListItem extends StatelessWidget {
                             user.name.isNotEmpty
                                 ? user.name[0].toUpperCase()
                                 : '?',
-                            style: const TextStyle(
+                            style: GoogleFonts.montserrat(
                               color: Colors.black54,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -314,14 +319,14 @@ class RequestListItem extends StatelessWidget {
                     children: [
                       Text(
                         user.name,
-                        style: const TextStyle(
+                        style: GoogleFonts.montserrat(
                           fontWeight: FontWeight.w500,
                           fontSize: 20,
                         ),
                       ),
                       Text(
                         user.phoneNumber,
-                        style: const TextStyle(
+                        style: GoogleFonts.montserrat(
                           color: Colors.black87,
                           fontSize: 13,
                         ),
@@ -352,9 +357,9 @@ class RequestListItem extends StatelessWidget {
                       minimumSize: const Size(0, 36),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Reject',
-                      style: TextStyle(
+                      style: GoogleFonts.montserrat(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -379,9 +384,9 @@ class RequestListItem extends StatelessWidget {
                       minimumSize: const Size(0, 36),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Accept',
-                      style: TextStyle(
+                      style: GoogleFonts.montserrat(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -393,7 +398,7 @@ class RequestListItem extends StatelessWidget {
             ),
           ),
 
-          SizedBox(
+          const SizedBox(
             height: 10,
           ),
           Container(
@@ -414,9 +419,9 @@ class RequestListItem extends StatelessWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 minimumSize: Size.zero,
               ),
-              child: const Text(
+              child: Text(
                 'View in Detail',
-                style: TextStyle(
+                style: GoogleFonts.montserrat(
                   color: Colors.blue,
                   fontSize: 14,
                 ),
@@ -469,7 +474,7 @@ class EmployeeListItem extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(
+                      style: GoogleFonts.montserrat(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
@@ -477,7 +482,7 @@ class EmployeeListItem extends StatelessWidget {
                     const SizedBox(height: 2),
                     // Text(
                     //   role,
-                    //   style: TextStyle(
+                    //   style: GoogleFonts.montserrat(
                     //     color: Colors.grey[600],
                     //     fontSize: 16,
                     //   ),
@@ -503,15 +508,16 @@ class UserDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Details'),
+        title: Text('User Details', 
+          style: GoogleFonts.montserrat(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
-        titleTextStyle: const TextStyle(
-          color: Colors.black,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -524,7 +530,7 @@ class UserDetailScreen extends StatelessWidget {
                 backgroundColor: Colors.blue.shade200,
                 child: Text(
                   user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 36,
@@ -575,7 +581,7 @@ class DetailItem extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: GoogleFonts.montserrat(
               color: Colors.grey,
               fontSize: 14,
             ),
@@ -583,7 +589,7 @@ class DetailItem extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(
+            style: GoogleFonts.montserrat(
               fontSize: 16,
               fontWeight: FontWeight.w500,
               color: valueColor,

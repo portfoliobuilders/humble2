@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:humble/view/user/user_login.dart';
 import 'package:humble/provider/user_providers.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class RegisterPage extends StatefulWidget {
   @override
@@ -36,7 +37,7 @@ class _RegisterPageState extends State<RegisterPage> {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
+                style: GoogleFonts.montserrat(
                   color: Colors.white,
                   fontSize: 16.0,
                   fontWeight: FontWeight.w400,
@@ -70,7 +71,7 @@ class _RegisterPageState extends State<RegisterPage> {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
+                style: GoogleFonts.montserrat(
                   color: Colors.white,
                   fontSize: 16.0,
                   fontWeight: FontWeight.w400,
@@ -201,9 +202,9 @@ Future<void> _handleGoogleSignIn() async {
                   height: 50.0,
                 ),
                 const SizedBox(height: 20.0),
-                const Text(
+                Text(
                   'Register',
-                  style: TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.white,
                     fontSize: 38.0,
                     fontWeight: FontWeight.bold,
@@ -212,9 +213,9 @@ Future<void> _handleGoogleSignIn() async {
                 const SizedBox(height: 10.0),
                 Row(
                   children: [
-                    const Text(
+                    Text(
                       'Already have an account?',
-                      style: TextStyle(
+                      style: GoogleFonts.montserrat(
                         color: Colors.white70,
                         fontSize: 16.0,
                       ),
@@ -226,9 +227,9 @@ Future<void> _handleGoogleSignIn() async {
                           MaterialPageRoute(builder: (context) => SignInPage()),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         'Login?',
-                        style: TextStyle(
+                        style: GoogleFonts.montserrat(
                           color: Colors.blue,
                           fontSize: 16.0,
                           fontWeight: FontWeight.bold,
@@ -260,11 +261,12 @@ Future<void> _handleGoogleSignIn() async {
                             children: [
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                                child: Text("First Name"),
+                                child: Text("First Name", style: GoogleFonts.montserrat()),
                               ),
                               const SizedBox(height: 5.0),
                               TextField(
                                 controller: _firstNameController,
+                                style: GoogleFonts.montserrat(),
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12.0),
@@ -296,11 +298,12 @@ Future<void> _handleGoogleSignIn() async {
                             children: [
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                                child: Text("Last Name"),
+                                child: Text("Last Name", style: GoogleFonts.montserrat()),
                               ),
                               const SizedBox(height: 5.0),
                               TextField(
                                 controller: _secondNameController,
+                                style: GoogleFonts.montserrat(),
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12.0),
@@ -330,11 +333,12 @@ Future<void> _handleGoogleSignIn() async {
                     const SizedBox(height: 10.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Email"),
+                      child: Text("Email", style: GoogleFonts.montserrat()),
                     ),
                     const SizedBox(height: 5.0),
                     TextField(
                       controller: _emailController,
+                      style: GoogleFonts.montserrat(),
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
@@ -359,10 +363,12 @@ Future<void> _handleGoogleSignIn() async {
                     const SizedBox(height: 10.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Phone Number"),
+                      child: Text("Phone Number", style: GoogleFonts.montserrat()),
                     ),
                     const SizedBox(height: 5.0),
                     IntlPhoneField(
+                      style: GoogleFonts.montserrat(),
+                      dropdownTextStyle: GoogleFonts.montserrat(),
                       flagsButtonPadding: const EdgeInsets.all(8),
                       dropdownIconPosition: IconPosition.trailing,
                       decoration: InputDecoration(
@@ -396,11 +402,12 @@ Future<void> _handleGoogleSignIn() async {
                     const SizedBox(height: 0.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Password"),
+                      child: Text("Password", style: GoogleFonts.montserrat()),
                     ),
                     const SizedBox(height: 5.0),
                     TextField(
                       controller: _passwordController,
+                      style: GoogleFonts.montserrat(),
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
@@ -497,9 +504,12 @@ Future<void> _handleGoogleSignIn() async {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Text(
+                          : Text(
                               'Register',
-                              style: TextStyle(color: Colors.white, fontSize: 16.0),
+                              style: GoogleFonts.montserrat(
+                                color: Colors.white, 
+                                fontSize: 16.0
+                              ),
                             ),
                     ),
                     SizedBox(height: 20),
@@ -513,9 +523,9 @@ Future<void> _handleGoogleSignIn() async {
                             endIndent: 10,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Or register with',
-                          style: TextStyle(
+                          style: GoogleFonts.montserrat(
                             color: Colors.grey,
                             fontSize: 14,
                           ),
@@ -539,9 +549,9 @@ Future<void> _handleGoogleSignIn() async {
                           width: 180,
                           child: OutlinedButton.icon(
                             onPressed: _isLoading ? null : _handleGoogleSignIn,
-                            label: const Text(
+                            label: Text(
                               "Google",
-                              style: TextStyle(color: Colors.black),
+                              style: GoogleFonts.montserrat(color: Colors.black),
                             ),
                             icon: Image.asset(
                               'assets/google.png',
@@ -564,9 +574,9 @@ Future<void> _handleGoogleSignIn() async {
                           width: 180,
                           child: OutlinedButton.icon(
                             onPressed: _isLoading ? null : _handleFacebookSignIn,
-                            label: const Text(
+                            label: Text(
                               "Facebook",
-                              style: TextStyle(color: Colors.black),
+                              style: GoogleFonts.montserrat(color: Colors.black),
                             ),
                             icon: Image.asset(
                               'assets/facebook.png',
@@ -592,7 +602,7 @@ Future<void> _handleGoogleSignIn() async {
                           children: [
                             TextSpan(
                               text: 'By registering, you agree to ',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.normal,
@@ -600,7 +610,7 @@ Future<void> _handleGoogleSignIn() async {
                             ),
                             TextSpan(
                               text: 'the Terms of Service and Data Processing Agreement',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.bold,

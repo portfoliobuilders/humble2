@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:humble/model/user_models.dart';
 import 'package:humble/provider/user_providers.dart';
 import 'package:humble/view/user/checkout.dart';
 import 'package:humble/view/user/notification.dart';
@@ -17,16 +19,33 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String? _currentLocationMessage;
   double _sliderPosition = 0.0;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      userProvider.fetchUserProfileProvider();
-      userProvider.fetchLocationProvider();
-      userProvider.fetchWorkingHoursProvider();
+      _initializeData();
     });
+  }
+
+  Future<void> _initializeData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await userProvider.fetchUserProfileProvider();
+      await userProvider.fetchLocationProvider();
+      await userProvider.fetchWorkingHoursProvider();
+    } catch (e) {
+      // Handle silently - errors will be managed by the provider
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<Position> _determinePosition() async {
@@ -57,6 +76,55 @@ class _HomeScreenState extends State<HomeScreen> {
         desiredAccuracy: LocationAccuracy.medium);
   }
 
+  Future<void> _performCheckIn() async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+      // Check if there's an assigned location for today
+      final todayAssignment = _getTodayAssignment(userProvider);
+
+      if (todayAssignment == null) {
+        _showInfoSnackBar('No assignment scheduled for today');
+        return;
+      }
+
+      Position currentPosition = await _determinePosition();
+      await userProvider.checkInProvider(
+          currentPosition.latitude, currentPosition.longitude);
+
+      await userProvider.fetchWorkingHoursProvider();
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+          currentPosition.latitude, currentPosition.longitude);
+
+      String locationDetails = placemarks.isNotEmpty
+          ? "${placemarks[0].name}, ${placemarks[0].locality}"
+          : "${currentPosition.latitude}, ${currentPosition.longitude}";
+
+      setState(() {
+        _currentLocationMessage =
+            "$locationDetails at ${DateFormat('hh:mm a').format(DateTime.now())}";
+      });
+
+      _showSuccessSnackBar('Check-in successful');
+    } catch (e) {
+      String errorMessage = 'Check-in failed';
+
+      if (e.toString().contains('LocationServiceDisabledException')) {
+        errorMessage = 'Please enable location services';
+      } else if (e.toString().contains('LocationPermissionDeniedException')) {
+        errorMessage = 'Location permission required';
+      } else if (e.toString().contains('RadiusException')) {
+        errorMessage = 'You are not within the allowed check-in area';
+      } else if (e.toString().contains('NetworkException')) {
+        errorMessage = 'Network connection error. Please try again';
+      }
+
+      _showErrorSnackBar(errorMessage);
+    }
+  }
+
+// Replace the _performCheckOut error handling with this:
   Future<void> _performCheckOut() async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -69,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         Position currentPosition = await _determinePosition();
 
-        await userProvider.checkOutProvider(
+        final checkoutResult = await userProvider.checkOutProvider(
           result['headNurseSignature'],
           result['headNurseName'],
           currentPosition.latitude.toString(),
@@ -80,94 +148,68 @@ class _HomeScreenState extends State<HomeScreen> {
           _sliderPosition = 0.0;
         });
 
-        userProvider.fetchWorkingHoursProvider();
+        await userProvider.fetchWorkingHoursProvider();
 
         _showSuccessSnackBar(
-            'Checkout successful. Total Hours: ${result['totalHoursWorked']}');
+            'Checkout successful. Hours: ${checkoutResult['totalHoursWorked']}');
       } catch (e) {
-        String errorMessage;
-        if (e.toString().contains('denied')) {
-          errorMessage =
-              'Please enable location permissions in your browser settings to check out.';
-        } else if (e.toString().contains('disabled')) {
-          errorMessage =
-              'Please enable location services on your device to check out.';
-        } else {
-          errorMessage = 'Checkout failed: ${e.toString()}';
+        String errorMessage = 'Checkout failed';
+
+        if (e.toString().contains('LocationServiceDisabledException')) {
+          errorMessage = 'Please enable location services';
+        } else if (e.toString().contains('LocationPermissionDeniedException')) {
+          errorMessage = 'Location permission required';
+        } else if (e.toString().contains('NetworkException')) {
+          errorMessage = 'Network connection error. Please try again';
+        } else if (e.toString().contains('ValidationException')) {
+          errorMessage = 'Invalid head nurse signature';
         }
+
         _showErrorSnackBar(errorMessage);
       }
     }
   }
 
-  Future<void> _performCheckIn() async {
+// Add a new method for information-type notifications
+  void _showInfoSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.montserrat(),
+        ),
+        backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  AssignedDate? _getTodayAssignment(UserProvider userProvider) {
+    if (userProvider.assignedDates == null ||
+        userProvider.assignedDates!.isEmpty) {
+      return null;
+    }
+
+    String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Only return assignment if the date exactly matches today
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-
-      // Get the assigned location
-      final assignedLocation = userProvider.location;
-
-      if (assignedLocation == null) {
-        _showErrorSnackBar('No assigned location found');
-        return;
-      }
-
-      // Get current position using the new method
-      Position currentPosition = await _determinePosition();
-
-      // Calculate distance between current and assigned location
-      double distance = Geolocator.distanceBetween(
-          currentPosition.latitude,
-          currentPosition.longitude,
-          assignedLocation.latitude,
-          assignedLocation.longitude);
-
-      // Check if within 100 meters
-      const double maxAllowedDistance = 100; // meters
-      if (distance <= maxAllowedDistance) {
-        // Perform check-in
-        await userProvider.checkInProvider(
-            currentPosition.latitude, currentPosition.longitude);
-
-        // Refresh working hours after check-in
-        userProvider.fetchWorkingHoursProvider();
-
-        // Get readable location details
-        List<Placemark> placemarks = await placemarkFromCoordinates(
-            currentPosition.latitude, currentPosition.longitude);
-
-        String locationDetails = placemarks.isNotEmpty
-            ? "${placemarks[0].name}, ${placemarks[0].locality}"
-            : "${currentPosition.latitude}, ${currentPosition.longitude}";
-
-        setState(() {
-          _currentLocationMessage =
-              "$locationDetails at ${DateFormat('hh:mm a').format(DateTime.now())}";
-        });
-
-        _showSuccessSnackBar('Check-in successful');
-      } else {
-        _showErrorSnackBar('You are not within the allowed check-in radius');
-      }
+      return userProvider.assignedDates!.firstWhere(
+        (assignment) => assignment.date == today,
+      );
     } catch (e) {
-      String errorMessage;
-      if (e.toString().contains('denied')) {
-        errorMessage =
-            'Please enable location permissions in your browser settings to check in.';
-      } else if (e.toString().contains('disabled')) {
-        errorMessage =
-            'Please enable location services on your device to check in.';
-      } else {
-        errorMessage = 'Error accessing location: ${e.toString()}';
-      }
-      _showErrorSnackBar(errorMessage);
+      // If no match is found, return null instead of a default assignment
+      return null;
     }
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: GoogleFonts.montserrat(),
+        ),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 2),
       ),
@@ -177,7 +219,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: GoogleFonts.montserrat(),
+        ),
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 2),
       ),
@@ -189,35 +234,38 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Main content
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Container(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 24),
-                      // _buildDateSelector(),
-                      // const SizedBox(height: 24),
-                      _buildWorkingHoursAndAttendance(),
-                      const SizedBox(height: 24),
-                      _buildActivitySection(),
-                    ],
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  // Main content
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _initializeData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Container(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeader(),
+                              const SizedBox(height: 24),
+                              _buildWorkingHoursAndAttendance(),
+                              const SizedBox(height: 16),
+                              _buildActivitySection(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: _buildSliderButton(),
+                  ),
+                ],
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: _buildSliderButton(),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -225,7 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSliderButton() {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        final bool isReady = userProvider.isAvailable;
         final bool isCheckedIn = userProvider.isCheckedIn;
 
         return LayoutBuilder(
@@ -263,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             isCheckedIn
                                 ? 'Slide to Check Out'
                                 : 'Slide to Check In',
-                            style: const TextStyle(
+                            style: GoogleFonts.montserrat(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -298,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 }
                               } catch (e) {
                                 _showErrorSnackBar(
-                                    'Operation failed: ${e.toString()}');
+                                    'Operation failed. Please try again.');
                               } finally {
                                 setState(() {
                                   _sliderPosition = startPosition;
@@ -357,7 +404,10 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, userProvider, child) {
         final user = userProvider.userProfile?.user;
         if (user == null) {
-          return const CircularProgressIndicator();
+          return const SizedBox(
+            height: 50,
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -366,8 +416,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 children: [
                   const CircleAvatar(
-                    radius: 20,
-                    backgroundImage: AssetImage('assets/user (1).png'),
+                    radius: 35,
+                    backgroundImage: AssetImage('assets/image.png'),
                   ),
                   const SizedBox(width: 12),
                   Flexible(
@@ -376,18 +426,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           user.name,
-                          style: const TextStyle(
-                            fontSize: 18,
+                          style: GoogleFonts.montserrat(
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const Text(
-                          'Floor Manager',
-                          style: TextStyle(
+                        Text(
+                          'Employee',
+                          style: GoogleFonts.montserrat(
                             color: Colors.grey,
-                            fontSize: 14,
+                            fontSize: 16,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -395,15 +446,41 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const NotificationScreen()),
-                );
-              },
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined),
+                  onPressed: () {
+                    // Mark notifications as read when navigating to notification screen
+                    if (userProvider.hasNewNotifications) {
+                      userProvider.markNotificationsAsRead();
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationScreen(),
+                      ),
+                    );
+                  },
+                ),
+                if (userProvider.hasNewNotifications)
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 4),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 10,
+                        minHeight: 10,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         );
@@ -414,141 +491,174 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWorkingHoursAndAttendance() {
     return Consumer<UserProvider>(
       builder: (context, userProvider, child) {
-        final location = userProvider.location;
+        final todayAssignment = _getTodayAssignment(userProvider);
         final workingHours = userProvider.workingHours;
+        final user = userProvider.userProfile?.user;
+        if (user == null) {
+          return const SizedBox(
+            height: 50,
+            child: Center(child: Text('Welcome to Humble')),
+          );
+        }
+
+        // Check if this is a new student without any assignments
+        final bool isNewStudent = userProvider.assignedDates == null ||
+            userProvider.assignedDates!.isEmpty;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Today's Attendance",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              "Today's Assignment",
+              style: GoogleFonts.montserrat(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Location Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        isNewStudent
+                            ? 'Hi ${user?.name} '
+                            : 'Assigned Location',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                          isNewStudent
+                              ? Icons.back_hand_rounded
+                              : (todayAssignment != null
+                                  ? Icons.location_on
+                                  : Icons.notifications_active),
+                          color: Colors.blue,
+                          size: 20),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      isNewStudent
+                          ? 'Welcome to Humble Hearts'
+                          : (todayAssignment != null
+                              ? todayAssignment.locationName
+                              : 'No assignment for today'),
+                      style: GoogleFonts.montserrat(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isNewStudent) ...[
+                    Center(
+                      child: Text(
+                        'Your first location will be assigned soon',
+                        style: GoogleFonts.montserrat(
+                            fontSize: 12, color: Colors.grey.shade600),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ] else if (todayAssignment != null) ...[
+                    
+                    Center(
+                      child: Text(
+                        'Date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(todayAssignment.date))}',
+                        style: GoogleFonts.montserrat(
+                            fontSize: 18, color: Colors.black54),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Center(
+                      child: Text(
+                        '${todayAssignment.latitude}, ${todayAssignment.longitude}',
+                        style: GoogleFonts.montserrat(
+                            fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ] else ...[
+                    Center(
+                      child: Text(
+                        'Please check your schedule for upcoming assignments',
+                        style: GoogleFonts.montserrat(
+                            fontSize: 12, color: Colors.grey.shade600),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Total Working Hours Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.access_time_outlined,
+                          color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Total Working Hours',
+                        style: GoogleFonts.montserrat(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      workingHours?.totalHoursWorked ?? '0:00',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'For This Month',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                // Left side - Location info
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade100, width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.location_on, color: Colors.blue),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                'Assigned Location',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          location?.name ?? 'Loading...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          location != null
-                              ? '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}'
-                              : 'Fetching location',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 16),
-
-                // Right side - Total Hours info
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade100, width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.access_time, color: Colors.blue),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                'Total Working Hours',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          workingHours?.totalHoursWorked ?? 'Loading...',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'For This Month',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: const [
-                Expanded(
-                  child: AttendanceCard(
-                    title: 'Break Time',
-                    time: '00:45 min',
-                    subtitle: 'Avg Time',
-                    icon: Icons.timer,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: AttendanceCard(
-                    title: 'Total Days',
-                    time: '28',
-                    subtitle: 'Working Days',
-                    icon: Icons.calendar_today,
-                  ),
-                ),
-              ],
-            ),
           ],
         );
       },
@@ -569,11 +679,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Your Activity',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              'Your Recent Activity',
+              style: GoogleFonts.montserrat(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
 
             // Only show the most recent activity
             if (workSessions.isNotEmpty) ...[
@@ -591,11 +704,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       subtitle: 'At ${workSessions[0].locationName}',
                       time: DateFormat('hh:mm a')
                           .format(DateTime.parse(workSessions[0].checkInTime)),
-                      status: 'On Time',
+                      status: '',
                       icon: Icons.login,
                     ),
 
-                    // Most recent check-out (if exists)
+                    const SizedBox(
+                      height: 8,
+                    ),
                     if (workSessions[0].checkOutTime != null)
                       ActivityItem(
                         title: 'Check Out',
@@ -668,135 +783,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
-  Widget _buildDateSelector() {
-    return SizedBox(
-      height: 80,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 7,
-        itemBuilder: (context, index) {
-          bool isSelected = index == 3;
-          return DateItem(
-            day: (index + 3).toString().padLeft(2, '0'),
-            weekDay: _getWeekDay(index),
-            isSelected: isSelected,
-          );
-        },
-      ),
-    );
-  }
-
-  String _getWeekDay(int index) {
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return weekDays[index % 7];
-  }
-}
-
-class DateItem extends StatelessWidget {
-  final String day;
-  final String weekDay;
-  final bool isSelected;
-
-  const DateItem({
-    Key? key,
-    required this.day,
-    required this.weekDay,
-    this.isSelected = false,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 60,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.blue : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            day,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.black,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            weekDay,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AttendanceCard extends StatelessWidget {
-  final String title;
-  final String time;
-  final String subtitle;
-  final IconData icon;
-
-  const AttendanceCard({
-    Key? key,
-    required this.title,
-    required this.time,
-    required this.subtitle,
-    required this.icon,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade200),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: Colors.blue),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            time,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class ActivityItem extends StatelessWidget {
@@ -836,13 +822,13 @@ class ActivityItem extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: GoogleFonts.montserrat(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.grey.shade600,
                     fontSize: 12,
                   ),
@@ -856,13 +842,13 @@ class ActivityItem extends StatelessWidget {
             children: [
               Text(
                 time,
-                style: const TextStyle(
+                style: GoogleFonts.montserrat(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 status,
-                style: TextStyle(
+                style: GoogleFonts.montserrat(
                   color: Colors.grey.shade600,
                   fontSize: 12,
                 ),

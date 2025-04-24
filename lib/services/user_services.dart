@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:humble/model/user_models.dart';
 
 class UserApi {
   String baseUrl = 'https://uknew.onrender.com/api';
@@ -119,8 +120,9 @@ class UserApi {
     }
   }
 
-  Future<http.Response> fetchLocationAPI(String token) async {
+  Future<AssignedLocationResponse> fetchLocationAPI(String token) async {
     final url = Uri.parse('$baseUrl/student/getLocation');
+
     try {
       final response = await http.get(
         url,
@@ -130,17 +132,33 @@ class UserApi {
         },
       );
 
-      print('Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
-
       if (response.statusCode == 200) {
-        return response;
+        final Map<String, dynamic> responseBody = json.decode(response.body);
+        return AssignedLocationResponse.fromJson(responseBody);
+      } else if (response.statusCode == 404) {
+        // 404 means no locations assigned for this student yet - this is normal, not an error
+        return AssignedLocationResponse(
+          success: true, // Mark as success so we don't treat this as an error
+          message: 'No locations assigned',
+          assignedDates: [], // Empty list of assignments
+        );
       } else {
-        throw Exception('Failed to fetch location: ${response.body}');
+        // For other error codes
+        return AssignedLocationResponse(
+          success: false,
+          message:
+              'Failed to fetch location data (Status: ${response.statusCode})',
+          assignedDates: [],
+        );
       }
     } catch (e) {
+      // For network or parsing errors
       print('Error in fetchLocationAPI: $e');
-      rethrow;
+      return AssignedLocationResponse(
+        success: false,
+        message: 'Error connecting to server',
+        assignedDates: [],
+      );
     }
   }
 
@@ -149,7 +167,6 @@ class UserApi {
     final url = Uri.parse('$baseUrl/student/checkIn');
     try {
       print('Check-In Request Details:');
-
       final response = await http.post(
         url,
         headers: {
@@ -164,14 +181,29 @@ class UserApi {
 
       print('Status Code: ${response.statusCode}');
       print('Response Headers: ${response.headers}');
-      print('Response Body: ${response.body}');
 
-      if (response.statusCode == 400) {
-        throw Exception('Bad Request: Check input parameters');
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid or expired token');
-      } else if (response.statusCode == 500) {
-        throw Exception('Server Error: Internal server problem');
+      // Try to parse as JSON first
+      String responseBody = response.body;
+      try {
+        final decoded = json.decode(responseBody);
+        print('Response Body (JSON): $decoded');
+
+        // Check for error message in JSON
+        if (response.statusCode >= 400) {
+          String errorMessage = decoded['message'] ?? 'Unknown error occurred';
+          throw Exception(errorMessage);
+        }
+      } catch (e) {
+        // If not JSON, just print the raw body
+        print('Response Body (raw): $responseBody');
+
+        if (response.statusCode == 400) {
+          throw Exception('Bad Request: Check input parameters');
+        } else if (response.statusCode == 401) {
+          throw Exception('Unauthorized: Invalid or expired token');
+        } else if (response.statusCode == 500) {
+          throw Exception('Server Error: Internal server problem');
+        }
       }
 
       return response;
@@ -203,14 +235,17 @@ class UserApi {
       print('Response Headers: ${response.headers}');
       print('Response Body: ${response.body}');
 
-      if (response.statusCode == 400) {
+      // Add 404 error handling
+      if (response.statusCode == 404) {
+        throw Exception(
+            'Not Found: The endpoint /student/checkOut does not exist');
+      } else if (response.statusCode == 400) {
         throw Exception('Bad Request: Check input parameters');
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
       } else if (response.statusCode == 500) {
         throw Exception('Server Error: Internal server problem');
       }
-
       return response;
     } catch (e) {
       print('Detailed Error during check-out: $e');
@@ -301,30 +336,35 @@ class UserApi {
     }
   }
 
-  Future<http.Response> fetchProposedDatesAPI(String token) async {
-    final url = Uri.parse('$baseUrl/student/getRequest');
-    try {
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+  Future<ProposedDatesModel> fetchProposedDatesAPI(String token) async {
+  final url = Uri.parse('$baseUrl/student/getRequest');
+  try {
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
 
-      print('Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
+    print('Status Code: ${response.statusCode}');
+    print('Response Body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        return response;
-      } else {
-        throw Exception('Failed to fetch proposed dates: ${response.body}');
-      }
-    } catch (e) {
-      print('Error in fetchProposedDatesAPI: $e');
-      rethrow;
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+
+      // Assuming proposedDates is directly under the root
+      final proposedDatesModel = ProposedDatesModel.fromJson(jsonResponse);
+      return proposedDatesModel;
+    } else {
+      throw Exception('Failed to fetch proposed dates: ${response.body}');
     }
+  } catch (e) {
+    print('Error in fetchProposedDatesAPI: $e');
+    rethrow;
   }
+}
+
 
   Future<http.Response> sendDateResponsesAPI({
     required String token,

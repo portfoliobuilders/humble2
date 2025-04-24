@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:humble/view/admin/forget_password.dart';
 import 'package:humble/view/user/user_login.dart';
@@ -44,9 +45,9 @@ class _AdminLoginState extends State<AdminLogin> {
                   ],
                 ),
                 const SizedBox(height: 30.0),
-                const Text(
+                Text(
                   'Sign in to your \nAdmin Account',
-                  style: TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.white,
                     fontSize: 38.0,
                     fontWeight: FontWeight.bold,
@@ -56,7 +57,9 @@ class _AdminLoginState extends State<AdminLogin> {
                   children: [
                     Text(
                       'Not an admin?',
-                      style: TextStyle(color: Colors.white),
+                      style: GoogleFonts.montserrat(
+                        color: Colors.white,
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
@@ -66,9 +69,9 @@ class _AdminLoginState extends State<AdminLogin> {
                               builder: (context) => SignInPage()),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         "Login as User",
-                        style: TextStyle(
+                        style: GoogleFonts.montserrat(
                           color: Colors.blue,
                           decoration: TextDecoration.underline,
                           decorationColor: Colors.blue,
@@ -92,11 +95,15 @@ class _AdminLoginState extends State<AdminLogin> {
                     const SizedBox(height: 15.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Email"),
+                      child: Text(
+                        "Email",
+                        style: GoogleFonts.montserrat(),
+                      ),
                     ),
                     const SizedBox(height: 5.0),
                     TextField(
                       controller: _emailController,
+                      style: GoogleFonts.montserrat(),
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
@@ -121,12 +128,16 @@ class _AdminLoginState extends State<AdminLogin> {
                     const SizedBox(height: 16.0),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
-                      child: Text("Password"),
+                      child: Text(
+                        "Password",
+                        style: GoogleFonts.montserrat(),
+                      ),
                     ),
                     const SizedBox(height: 5.0),
                     TextField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      style: GoogleFonts.montserrat(),
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.0),
@@ -172,9 +183,11 @@ class _AdminLoginState extends State<AdminLogin> {
                                 builder: (context) => const AdminForgotPasswordScreen()),
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           'Forgot Password?',
-                          style: TextStyle(color: Colors.blue),
+                          style: GoogleFonts.montserrat(
+                            color: Colors.blue,
+                          ),
                         ),
                       ),
                     ),
@@ -222,21 +235,24 @@ class _AdminLoginState extends State<AdminLogin> {
                           ? const CircularProgressIndicator(
                               color: Colors.white,
                             )
-                          : const Text(
+                          : Text(
                               'Log In',
-                              style: TextStyle(
-                                  color: Colors.white, fontSize: 16.0),
+                              style: GoogleFonts.montserrat(
+                                color: Colors.white,
+                                fontSize: 16.0,
+                              ),
                             ),
                     ),
                     const SizedBox(height: 80.0),
                     Center(
                       child: RichText(
                         text: TextSpan(
+                          style: GoogleFonts.montserrat(),
                           children: [
                             TextSpan(
                               text:
                                   'Admin login is intended for authorized personnel only. ',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.normal,
@@ -244,7 +260,7 @@ class _AdminLoginState extends State<AdminLogin> {
                             ),
                             TextSpan(
                               text: 'Terms of Service apply',
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.black,
                                 fontSize: 12.0,
                                 fontWeight: FontWeight.bold,
@@ -267,7 +283,12 @@ class _AdminLoginState extends State<AdminLogin> {
 
   void _showSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.montserrat(),
+        ),
+      ),
     );
   }
 }

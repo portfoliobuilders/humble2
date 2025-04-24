@@ -192,62 +192,66 @@ class AdminApi {
     }
   }
 
-  Future<http.Response> assignLocationAPI(
+  Future<http.Response> assignStudentToLocationAPI(
     String token,
-    String studentId,
     String locationId,
+    List<String> studentId,
     List<String> assignedDates,
   ) async {
     final url = Uri.parse('$baseUrl/admin/assignLocation');
     try {
+      final requestBody = {
+        'locationId': locationId,
+        'studentId': studentId,
+        'assignedDates': assignedDates,
+      };
+
+      print('Sending request body: ${jsonEncode(requestBody)}');
+
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'studentId': studentId,
-          'locationId': locationId,
-          'assignedDates': assignedDates,
-        }),
+        body: jsonEncode(requestBody),
       );
+
       return response;
     } catch (e) {
-      print('Error marking student location: $e');
+      print('Error assigning student to location: $e');
       rethrow;
     }
   }
 
   Future<http.Response> proposeDatesAPI(
-    String token,
-    String userId,
-    List<String> proposedDates,
-  ) async {
-    final url = Uri.parse('$baseUrl/admin/assignWorkdates');
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'userId': userId,
-          'proposedDates': proposedDates,
-        }),
-      );
-      return response;
-    } catch (e) {
-      print('Error proposing dates: $e');
-      rethrow;
-    }
+  String token,
+  String userId,
+  List<Map<String, String>> proposedDates,
+) async {
+  final url = Uri.parse('$baseUrl/admin/assignWorkdates');
+  try {
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'userId': userId,
+        'proposedDates': proposedDates,
+      }),
+    );
+    return response;
+  } catch (e) {
+    print('Error proposing dates: $e');
+    rethrow;
   }
+}
 
   Future<http.Response> fetchAssignedDatesAPI(
       String token, String userId) async {
-    final url = Uri.parse(
-        '$baseUrl/admin/getAssignedDates/$userId'); 
+    final url = Uri.parse('$baseUrl/admin/getAssignedDates/$userId');
     try {
       final response = await http.get(
         url,
@@ -262,7 +266,8 @@ class AdminApi {
       rethrow;
     }
   }
-    Future<http.Response> sendForgotPasswordEmail({
+
+  Future<http.Response> sendForgotPasswordEmail({
     required String email,
   }) async {
     final url = Uri.parse('$baseUrl/forgotPassword');
@@ -330,4 +335,61 @@ class AdminApi {
       rethrow;
     }
   }
+
+  Future<http.Response> editAssignedLocationAPI(
+    String token,
+    String studentId,
+    String dateToEdit,
+    String newDate,
+    String newLocationId,
+  ) async {
+    final url =
+        Uri.parse('$baseUrl/admin/editAssignedlocation');
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'studentId': studentId,
+          'dateToEdit': dateToEdit,
+          'newDate': newDate,
+          'newLocationId': newLocationId,
+        }),
+      );
+      return response;
+    } catch (e) {
+      print('Error editing assigned location: $e');
+      rethrow;
+    }
+  }
+
+  Future<http.Response> deleteAssignedLocationAPI(
+    String token,
+    String studentId,
+    String dateToDelete,
+  ) async {
+    final url = Uri.parse('$baseUrl/admin/delteDates');
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'studentId': studentId,
+          'dateToDelete': dateToDelete,
+        }),
+      );
+      return response;
+    } catch (e) {
+      print('Error deleting assigned location: $e');
+      rethrow;
+    }
+  }
+
+
 }

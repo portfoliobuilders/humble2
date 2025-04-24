@@ -3,6 +3,7 @@ import 'package:humble/model/admin_model.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class EmployeeAvailabilityPage extends StatefulWidget {
   final ReadyToWorkUser user;
@@ -26,7 +27,10 @@ class EmployeeAvailabilityPage extends StatefulWidget {
 class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
   Set<DateTime> _selectedDates = {};
   Set<DateTime> _proposedDates = {};
+  Set<DateTime> _selectedAssignedDates =
+      {}; // Track selected assigned dates for deletion
   bool _isLoading = true;
+  bool _isDeleting = false; // Track deletion state
   late PageController _pageController;
   int _currentPage = 6;
   List<DateTime> _assignedDates = [];
@@ -58,13 +62,12 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
       if (success && mounted) {
         setState(() {
           // Update assignedDates with the fetched data
-          if (provider.assignedDatesResponse != null &&
-              provider.assignedDatesResponse!.assignedDates.isNotEmpty) {
-            // Convert the string dates to DateTime objects
-            _assignedDates =
-                provider.assignedDatesResponse!.assignedDates.map((dateString) {
+          if (provider.assignedDatesResponse != null) {
+            // Convert the date strings to DateTime objects
+            _assignedDates = provider.assignedDatesResponse!.assignedDates
+                .map((assignedDateItem) {
               // Parse the string date to DateTime
-              return DateFormat('yyyy-MM-dd').parse(dateString);
+              return DateFormat('yyyy-MM-dd').parse(assignedDateItem.date);
             }).toList();
           }
           _isLoading = false;
@@ -75,8 +78,11 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to fetch assigned dates'),
+          SnackBar(
+            content: Text(
+              'Failed to fetch assigned dates',
+              style: GoogleFonts.montserrat(),
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -90,7 +96,10 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error fetching assigned dates: $e'),
+            content: Text(
+              'Error fetching assigned dates: $e',
+              style: GoogleFonts.montserrat(),
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -105,6 +114,72 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
     super.dispose();
   }
 
+  // New function to delete assigned dates
+  Future<void> _deleteAssignedDates() async {
+    if (_selectedAssignedDates.isEmpty) return;
+
+    try {
+      setState(() {
+        _isDeleting = true;
+      });
+
+      final provider = Provider.of<AdminProvider>(context, listen: false);
+
+      // Process each selected assigned date for deletion
+      for (final date in _selectedAssignedDates) {
+        final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+        await provider.deleteAssignedLocationProvider(
+          widget.user.studentId,
+          formattedDate,
+        );
+      }
+
+      // Refresh assigned dates
+      await _fetchAssignedDates();
+
+      // Clear the selected assigned dates
+      setState(() {
+        _selectedAssignedDates.clear();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Assignments deleted successfully',
+              style: GoogleFonts.montserrat(),
+            ),
+            backgroundColor: const Color(0xFF4CD964),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final errorMessage = e.toString().contains('Server returned')
+            ? 'Server error occurred. Please try again.'
+            : 'Failed to delete assignments: ${e.toString().split(':').first}';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorMessage,
+              style: GoogleFonts.montserrat(),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
   Future<void> _assignLocation() async {
     if (_selectedDates.isEmpty) return;
 
@@ -113,90 +188,143 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
         _isLoading = true;
       });
 
-      // Convert DateTime to formatted strings (yyyy-MM-dd)
-      List<String> formattedDates = _selectedDates
-          .map((date) => DateFormat('yyyy-MM-dd').format(date))
-          .toList();
-
-      // Split dates into categories: available dates and newly proposed dates
+      // Split into available and new dates
       Set<DateTime> availableDatesSet = widget.user.readyToWorkDates
           .map((date) => DateTime(date.year, date.month, date.day))
           .toSet();
 
       List<String> existingDates = [];
-      List<String> newDates = [];
+      List<Map<String, String>> newDates = [];
 
       for (DateTime date in _selectedDates) {
         DateTime normalizedDate = DateTime(date.year, date.month, date.day);
-        if (availableDatesSet.contains(normalizedDate)) {
-          existingDates.add(DateFormat('yyyy-MM-dd').format(date));
-        } else {
-          newDates.add(DateFormat('yyyy-MM-dd').format(date));
+        String formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
-          // Add to proposed dates set for UI highlighting
-          _proposedDates.add(normalizedDate);
+        if (availableDatesSet.contains(normalizedDate)) {
+          existingDates.add(formattedDate);
+        } else {
+          newDates.add({
+            "date": formattedDate,
+            "location": widget.locationId, // include the location ID
+          });
         }
       }
 
       final provider = Provider.of<AdminProvider>(context, listen: false);
       List<DateTime> assignedDatesList = [];
+      bool hasAssignments = false;
+      bool hasProposals = false;
+      List<DateTime> proposedDatesList = [];
 
-      // Process existing dates
+      // Assign existing dates
       if (existingDates.isNotEmpty) {
-        await provider.assignLocationProvider(
-          widget.user.studentId,
-          widget.locationId,
-          existingDates,
-        );
+        print('Assigning existing dates: $existingDates');
 
-        // Add these dates to our assigned dates list
-        for (String dateStr in existingDates) {
-          assignedDatesList.add(DateFormat('yyyy-MM-dd').parse(dateStr));
+        try {
+          await provider.assignStudentToLocationProvider(
+            widget.locationId,
+            [widget.user.studentId],
+            existingDates,
+          );
+
+          assignedDatesList = existingDates
+              .map((dateStr) => DateFormat('yyyy-MM-dd').parse(dateStr))
+              .toList();
+          hasAssignments = true;
+        } catch (e) {
+          print('Error in assignment: $e');
+          throw e;
         }
       }
 
-      // Process new proposed dates
+      // Propose new dates
       if (newDates.isNotEmpty) {
-        await provider.proposeDatesProvider(
+        print('Proposing new dates with location: $newDates');
+
+        final response = await provider.proposeDatesProvider(
           widget.user.studentId,
           newDates,
         );
 
-        await provider.assignLocationProvider(
-          widget.user.studentId,
-          widget.locationId,
-          newDates,
-        );
+        if (response != null && response['success'] == true) {
+          hasProposals = true;
 
-        // Add these dates to our assigned dates list
-        for (String dateStr in newDates) {
-          assignedDatesList.add(DateFormat('yyyy-MM-dd').parse(dateStr));
+          if (response['adminProposedDates'] != null) {
+            List<dynamic> proposedDatesFromResponse =
+                response['adminProposedDates'];
+
+            // Clear existing proposed dates to avoid duplicates
+            _proposedDates.clear();
+
+            for (var dateItem in proposedDatesFromResponse) {
+              // Handle as a Map instead of a String
+              if (dateItem is Map && dateItem.containsKey('date')) {
+                String dateStr = dateItem['date'];
+                // Parse the date string from ISO format
+                DateTime date = DateTime.parse(dateStr);
+                DateTime normalizedDate =
+                    DateTime(date.year, date.month, date.day);
+                _proposedDates.add(normalizedDate);
+                proposedDatesList.add(normalizedDate);
+              }
+            }
+
+            // Update UI by resetting selections
+            _selectedDates.clear();
+
+            setState(() {
+              // This will trigger a UI refresh
+            });
+
+            print('Updated proposed dates: $_proposedDates');
+          }
         }
       }
 
-      // Update the parent with newly assigned dates
-      widget.onAssignmentComplete(assignedDatesList);
+      if (hasAssignments) {
+        widget.onAssignmentComplete(assignedDatesList);
+      }
 
-      // Success message
       if (mounted) {
+        // Show appropriate message
+        String message;
+        if (hasProposals && hasAssignments) {
+          message = 'Assignments completed and proposals sent successfully';
+        } else if (hasProposals) {
+          message = 'Proposals sent successfully. Awaiting user approval.';
+        } else {
+          message = 'Location assignments completed successfully';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location assignments completed successfully'),
-            backgroundColor: Color(0xFF4CD964),
+          SnackBar(
+            content: Text(
+              message,
+              style: GoogleFonts.montserrat(),
+            ),
+            backgroundColor: const Color(0xFF4CD964),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
           ),
         );
-      }
 
-      // Navigate back
-      if (mounted) {
-        Navigator.of(context).pop();
+        // Navigation decision
+        if (hasAssignments && !hasProposals) {
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       if (mounted) {
+        final errorMessage = e.toString().contains('Server returned')
+            ? 'Server error occurred. Please try again.'
+            : 'Failed to assign location: ${e.toString().split(':').first}';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to assign location: $e'),
+            content: Text(
+              errorMessage,
+              style: GoogleFonts.montserrat(),
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -251,7 +379,7 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
       appBar: AppBar(
         title: Text(
           'Assign ${widget.user.name}',
-          style: const TextStyle(
+          style: GoogleFonts.montserrat(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Colors.black,
@@ -297,7 +425,7 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                           widget.user.name.isNotEmpty
                               ? widget.user.name.substring(0, 1).toUpperCase()
                               : '?',
-                          style: const TextStyle(
+                          style: GoogleFonts.montserrat(
                             color: Colors.white,
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -311,7 +439,7 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                           children: [
                             Text(
                               widget.user.name,
-                              style: const TextStyle(
+                              style: GoogleFonts.montserrat(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 20,
                                 color: Colors.black,
@@ -320,7 +448,7 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                             const SizedBox(height: 4),
                             Text(
                               widget.user.phoneNumber,
-                              style: TextStyle(
+                              style: GoogleFonts.montserrat(
                                 color: Colors.grey.shade600,
                                 fontSize: 14,
                               ),
@@ -346,8 +474,8 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                                       const SizedBox(width: 4),
                                       Text(
                                         '${widget.user.readyToWorkDates.length} Available Days',
-                                        style: const TextStyle(
-                                          color: Color(0xFF4CD964),
+                                        style: GoogleFonts.montserrat(
+                                          color: const Color(0xFF4CD964),
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12,
                                         ),
@@ -386,10 +514,10 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                       ),
                       Text(
                         monthYearList[_currentPage],
-                        style: const TextStyle(
+                        style: GoogleFonts.montserrat(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
-                          color: Color(0xFF79C9FF),
+                          color: const Color(0xFF79C9FF),
                         ),
                       ),
                       IconButton(
@@ -444,14 +572,26 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
 
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  child: Column(
                     children: [
-                      _buildLegendItem(const Color.fromARGB(255, 198, 232, 255),
-                          'Available'),
-                      _buildLegendItem(Colors.green, 'Assigned'),
-                      _buildLegendItem(Colors.blue, 'Selected'),
-                      _buildLegendItem(Colors.orange, 'Proposed'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildLegendItem(
+                              const Color.fromARGB(255, 198, 232, 255),
+                              'Available'),
+                          _buildLegendItem(Colors.green, 'Assigned'),
+                          _buildLegendItem(Colors.blue, 'Selected'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildLegendItem(Colors.orange, 'Proposed'),
+                          _buildLegendItem(Colors.red, 'Selected for Deletion'),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -476,42 +616,105 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                           padding: const EdgeInsets.only(bottom: 12.0),
                           child: Text(
                             '${_selectedDates.length} dates selected',
-                            style: const TextStyle(
+                            style: GoogleFonts.montserrat(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF79C9FF),
+                              color: const Color(0xFF79C9FF),
                             ),
                           ),
                         ),
-                      ElevatedButton(
-                        onPressed:
-                            _selectedDates.isNotEmpty ? _assignLocation : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF79C9FF),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      if (_selectedAssignedDates.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Text(
+                            '${_selectedAssignedDates.length} assigned dates selected for deletion',
+                            style: GoogleFonts.montserrat(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
                           ),
-                          disabledBackgroundColor: Colors.grey.shade300,
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
+                      Row(
+                        children: [
+                          if (_selectedAssignedDates.isNotEmpty)
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ElevatedButton(
+                                  onPressed:
+                                      _isDeleting ? null : _deleteAssignedDates,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    minimumSize:
+                                        const Size(double.infinity, 50),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    disabledBackgroundColor:
+                                        Colors.grey.shade300,
+                                  ),
+                                  child: _isDeleting
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Delete ',
+                                          style: GoogleFonts.montserrat(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                 ),
-                              )
-                            : const Text(
-                                'Assign Location',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
+                            ),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _selectedDates.isNotEmpty &&
+                                      !_isDeleting &&
+                                      !_isLoading
+                                  ? _assignLocation
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF79C9FF),
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                disabledBackgroundColor: Colors.grey.shade300,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Assign Location',
+                                      style: GoogleFonts.montserrat(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(
+                  height: 18,
                 ),
               ],
             ),
@@ -530,7 +733,7 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: GoogleFonts.montserrat(fontSize: 12)),
       ],
     );
   }
@@ -558,6 +761,10 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
         .toSet();
 
     final assignedDaysSet = _assignedDates
+        .map((date) => DateTime(date.year, date.month, date.day))
+        .toSet();
+
+    final proposedDaysSet = _proposedDates
         .map((date) => DateTime(date.year, date.month, date.day))
         .toSet();
 
@@ -598,7 +805,9 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                 final isAvailable = availableDaysSet.contains(currentDate);
                 final isAssigned = assignedDaysSet.contains(currentDate);
                 final isSelected = _selectedDates.contains(currentDate);
-                final isProposed = _proposedDates.contains(currentDate);
+                final isSelectedForDeletion =
+                    _selectedAssignedDates.contains(currentDate);
+                final isProposed = proposedDaysSet.contains(currentDate);
 
                 // Build the day cell
                 return _CalendarDay(
@@ -607,21 +816,34 @@ class _EmployeeAvailabilityPageState extends State<EmployeeAvailabilityPage> {
                   isAssigned: isAssigned,
                   isSelected: isSelected,
                   isProposed: isProposed,
+                  isSelectedForDeletion: isSelectedForDeletion,
                   onTap: () {
                     setState(() {
-                      if (_selectedDates.contains(currentDate)) {
-                        _selectedDates.remove(currentDate);
-
-                        // Also remove from proposed dates if it's not available
-                        if (!isAvailable) {
-                          _proposedDates.remove(currentDate);
+                      // If it's an assigned date, handle it differently
+                      if (isAssigned) {
+                        if (_selectedAssignedDates.contains(currentDate)) {
+                          _selectedAssignedDates.remove(currentDate);
+                        } else {
+                          _selectedAssignedDates.add(currentDate);
+                          // Remove from regular selection if it was there
+                          _selectedDates.remove(currentDate);
                         }
                       } else {
-                        _selectedDates.add(currentDate);
+                        // Handle regular dates as before
+                        if (_selectedDates.contains(currentDate)) {
+                          _selectedDates.remove(currentDate);
 
-                        // If it's not in the available dates, mark it as proposed
-                        if (!isAvailable) {
-                          _proposedDates.add(currentDate);
+                          // Also remove from proposed dates if it was previously marked as proposed
+                          if (_proposedDates.contains(currentDate)) {
+                            _proposedDates.remove(currentDate);
+                          }
+                        } else {
+                          _selectedDates.add(currentDate);
+
+                          // If it's not in the available dates, mark it as proposed
+                          if (!isAvailable) {
+                            _proposedDates.add(currentDate);
+                          }
                         }
                       }
                     });
@@ -649,7 +871,7 @@ class _WeekdayLabel extends StatelessWidget {
       child: Center(
         child: Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.montserrat(
             color: Colors.grey[600],
             fontWeight: FontWeight.bold,
           ),
@@ -665,6 +887,7 @@ class _CalendarDay extends StatelessWidget {
   final bool isAssigned;
   final bool isSelected;
   final bool isProposed;
+  final bool isSelectedForDeletion;
   final VoidCallback onTap;
 
   const _CalendarDay({
@@ -674,6 +897,7 @@ class _CalendarDay extends StatelessWidget {
     required this.isAssigned,
     required this.isSelected,
     required this.isProposed,
+    this.isSelectedForDeletion = false,
     required this.onTap,
   }) : super(key: key);
 
@@ -683,7 +907,10 @@ class _CalendarDay extends StatelessWidget {
     Color textColor;
     BoxBorder? border;
 
-    if (isSelected) {
+    if (isSelectedForDeletion) {
+      bgColor = Colors.red; // Selected for deletion
+      textColor = Colors.white;
+    } else if (isSelected) {
       if (isAvailable) {
         bgColor = Colors.blue; // Selected and available
         textColor = Colors.white;
@@ -701,7 +928,7 @@ class _CalendarDay extends StatelessWidget {
     } else if (isAvailable) {
       bgColor = const Color.fromARGB(
           255, 198, 232, 255); // Available but not selected
-      textColor = Colors.white;
+      textColor = Colors.black;
     } else {
       bgColor = Colors.transparent; // Not available and not selected
       textColor = Colors.black;
@@ -720,9 +947,13 @@ class _CalendarDay extends StatelessWidget {
         child: Center(
           child: Text(
             date.day.toString(),
-            style: TextStyle(
+            style: GoogleFonts.montserrat(
               color: textColor,
-              fontWeight: isSelected || isAvailable || isAssigned || isProposed
+              fontWeight: isSelected ||
+                      isAvailable ||
+                      isAssigned ||
+                      isProposed ||
+                      isSelectedForDeletion
                   ? FontWeight.bold
                   : FontWeight.normal,
             ),

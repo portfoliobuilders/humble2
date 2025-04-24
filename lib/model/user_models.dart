@@ -80,65 +80,74 @@ UserProfile parseUserProfile(String responseBody) {
 }
 
 
-class LocationResponse {   
-  final bool success;   
-  final String message;   
-  final Location location;    
+class AssignedLocationResponse {
+  final bool success;
+  final String message;
+  final List<AssignedDate> assignedDates;
 
-  LocationResponse({     
-    required this.success,     
-    required this.message,     
-    required this.location,   
-  });    
+  AssignedLocationResponse({
+    required this.success,
+    required this.message,
+    required this.assignedDates,
+  });
 
-  factory LocationResponse.fromJson(Map<String, dynamic> json) {     
-    return LocationResponse(       
-      success: json['success'],       
-      message: json['message'],       
-      location: Location.fromJson(json['location']),     
-    );   
-  }    
+  factory AssignedLocationResponse.fromJson(Map<String, dynamic> json) {
+    return AssignedLocationResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      assignedDates: (json['assignedDates'] as List<dynamic>)
+          .map((item) => AssignedDate.fromJson(item))
+          .toList(),
+    );
+  }
 
-  Map<String, dynamic> toJson() {     
-    return {       
-      'success': success,       
-      'message': message,       
-      'location': location.toJson(),     
-    };   
-  } 
-}  
-
-class Location {   
-  final String locationId;   
-  final String name;   
-  final double latitude;   
-  final double longitude;    
-
-  Location({     
-    required this.locationId,     
-    required this.name,     
-    required this.latitude,     
-    required this.longitude,   
-  });    
-
-  factory Location.fromJson(Map<String, dynamic> json) {     
-    return Location(       
-      locationId: json['locationId'],       
-      name: json['name'],       
-      latitude: json['latitude'].toDouble(),       
-      longitude: json['longitude'].toDouble(),     
-    );   
-  }    
-
-  Map<String, dynamic> toJson() {     
-    return {       
-      'locationId': locationId,       
-      'name': name,       
-      'latitude': latitude,       
-      'longitude': longitude,     
-    };   
-  } 
+  Map<String, dynamic> toJson() {
+    return {
+      'success': success,
+      'message': message,
+      'assignedDates': assignedDates.map((e) => e.toJson()).toList(),
+    };
+  }
 }
+
+class AssignedDate {
+  final String date;
+  final String locationName;
+  final double latitude;
+  final double longitude;
+
+  AssignedDate({
+    required this.date,
+    required this.locationName,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  factory AssignedDate.fromJson(Map<String, dynamic> json) {
+    return AssignedDate(
+      date: json['date'] ?? '',
+      locationName: json['locationName'] ?? '',
+      latitude: _parseDouble(json['latitude']),
+      longitude: _parseDouble(json['longitude']),
+    );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    // Convert string to double if necessary
+    return value is double ? value : double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date,
+      'locationName': locationName,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+}
+
 
 class WorkingHours {
   final bool success;
@@ -212,24 +221,67 @@ class ReadyToWorkResponse {
 }
 
 class ProposedDatesModel {
-  final List<DateTime> proposedDates;
+  final List<ProposedDateItem> proposedDates;
 
   ProposedDatesModel({required this.proposedDates});
 
   factory ProposedDatesModel.fromJson(Map<String, dynamic> json) {
     return ProposedDatesModel(
-      proposedDates: List<String>.from(json['proposedDates'] ?? [])
-          .map((date) => DateTime.parse(date))
+      proposedDates: (json['proposedDates'] as List<dynamic>? ?? [])
+          .map((item) => ProposedDateItem.fromJson(item))
           .toList(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'proposedDates': proposedDates.map((date) => date.toUtc().toIso8601String()).toList(),
+      'proposedDates': proposedDates.map((item) => item.toJson()).toList(),
     };
   }
 }
+
+class ProposedDateItem {
+  final DateTime date;
+  final Location location;
+
+  ProposedDateItem({required this.date, required this.location});
+
+  factory ProposedDateItem.fromJson(Map<String, dynamic> json) {
+    return ProposedDateItem(
+      date: DateTime.parse(json['date']),
+      location: Location.fromJson(json['location']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date.toUtc().toIso8601String(),
+      'location': location.toJson(),
+    };
+  }
+}
+
+class Location {
+  final String id;
+  final String locationName;
+
+  Location({required this.id, required this.locationName});
+
+  factory Location.fromJson(Map<String, dynamic> json) {
+    return Location(
+      id: json['_id'],
+      locationName: json['locationname'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'locationname': locationName,
+    };
+  }
+}
+
 
 
 

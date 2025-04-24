@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:humble/view/user/ConfirmCheckoutScreen.dart';
 import 'package:provider/provider.dart';
 import 'package:humble/provider/user_providers.dart';
@@ -37,56 +38,65 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
   }
 
   Future<void> _performCheckout() async {
-  try {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    // Check if form is valid
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+      // Check if form is valid
+      if (!_formKey.currentState!.validate()) {
+        return;
+      }
 
-    // Check if signature is drawn
-    if (_signaturePoints.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please provide a signature before proceeding.'),
-          backgroundColor: Colors.red,
-        ),
+      // Check if signature is drawn
+      if (_signaturePoints.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please provide a signature before proceeding.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Convert signature to string
+      String headNurseSignature = _signatureToString();
+
+      // Get current position for checkout
+      Position currentPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.bestForNavigation);
+
+      // Perform checkout using provider with all required parameters
+      final result = await userProvider.checkOutProvider(
+        headNurseSignature,
+        _headNurseNameController.text,
+        currentPosition.latitude.toString(),
+        currentPosition.longitude.toString(),
       );
-      return;
+
+      // Navigate to confirmation screen instead of popping with result
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => Confirmcheckout(
+              nurseInChargeName: _headNurseNameController.text,
+              headNurseSignature: headNurseSignature,
+              totalHoursWorked: result['totalHoursWorked'],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Checkout failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-
-    // Convert signature to string
-    String headNurseSignature = _signatureToString();
-    
-    // Get current position for checkout
-    Position currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation);
-    
-    // Perform checkout using provider with all required parameters
-    final result = await userProvider.checkOutProvider(
-      headNurseSignature, 
-      _headNurseNameController.text,
-      currentPosition.latitude.toString(),
-      currentPosition.longitude.toString(),
-    );
-
-    // Return result to previous screen
-    Navigator.of(context).pop({
-      'headNurseSignature': headNurseSignature,
-      'headNurseName': _headNurseNameController.text,
-      'totalHoursWorked': result['totalHoursWorked'],
-    });
-  } catch (e) {
-    // Show error message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Checkout failed: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -107,26 +117,26 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Confirm Checkout',
-                style: TextStyle(
+                style: GoogleFonts.montserrat(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Please confirm that you have completed your shift by taking signature confirmation from nurse in-charge before your checkout.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black87,
+                style: GoogleFonts.montserrat(
+                  fontSize: 14,
+                  color: Colors.grey,
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "Head Nurse's Name",
-                style: TextStyle(
+              Text(
+                "Head In Charge",
+                style: GoogleFonts.montserrat(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -134,15 +144,22 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _headNurseNameController,
+                style: GoogleFonts.montserrat(),
                 decoration: InputDecoration(
-                  hintText: 'Enter head nurse name',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: const BorderSide(
+                        color: Color.fromARGB(255, 232, 232, 232), width: 1),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: const BorderSide(
+                        color: Color.fromARGB(255, 232, 232, 232), width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                    borderSide: const BorderSide(
+                        color: Color.fromARGB(255, 232, 232, 232), width: 1.5),
                   ),
                 ),
                 validator: (value) {
@@ -156,18 +173,18 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Signature',
-                    style: TextStyle(
+                    style: GoogleFonts.montserrat(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   TextButton(
                     onPressed: _clearSignature,
-                    child: const Text(
+                    child: Text(
                       'Clear',
-                      style: TextStyle(color: Colors.red),
+                      style: GoogleFonts.montserrat(color: Colors.red),
                     ),
                   ),
                 ],
@@ -178,7 +195,7 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
                 decoration: BoxDecoration(
                   color: const Color.fromARGB(255, 255, 255, 255),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black38),
+                  border: Border.all(color: Color.fromARGB(255, 232, 232, 232)),
                 ),
                 padding: const EdgeInsets.all(16),
                 child: GestureDetector(
@@ -199,9 +216,9 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Signature should only be marked by the nurse in-charge for the proper approval of checkout of your shift!',
-                style: TextStyle(
+                style: GoogleFonts.montserrat(
                   fontSize: 12,
                   color: Colors.grey,
                 ),
@@ -217,22 +234,23 @@ class _ConfirmCheckoutScreenState extends State<ConfirmCheckoutScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text(
+                child: Text(
                   'Submit',
-                  style: TextStyle(
-                      fontSize: 16, color: Color.fromARGB(255, 255, 255, 255)),
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () =>
-                    Navigator.of(context).pop(false), // Indicate cancel
+                onPressed: () => Navigator.of(context).pop(false),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text(
+                child: Text(
                   'Cancel',
-                  style: TextStyle(
+                  style: GoogleFonts.montserrat(
                     fontSize: 16,
                     color: Colors.black87,
                   ),

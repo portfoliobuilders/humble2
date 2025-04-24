@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:humble/constants/token.dart';
 import 'package:humble/model/user_models.dart';
 import 'package:humble/services/user_services.dart';
@@ -16,40 +17,48 @@ class UserProvider with ChangeNotifier {
   String? _token;
   UserProfile? _userProfile;
   bool _isAvailable = false;
-  Location? _location;
   bool _isCheckedIn = false;
   DateTime? _checkInTime;
   double? _distance;
-  Location? _assignedLocation;
   String? _headNurseSignature;
   String? _totalHoursWorked;
   WorkingHours? _workingHours;
   bool _isLoading = false;
   List<String> _readyToWorkDates = [];
   ReadyToWorkResponse? _readyToWorkData;
-  List<DateTime> _proposedDates = [];
+ List<ProposedDateItem> _proposedDates = [];
+
   String? _message;
+  List<AssignedDate> _assignedDates = [];
+  bool _hasNewNotifications = false;
 
   UserProfile? get userProfile => _userProfile;
   String? get token => _token;
   bool get isAvailable => _isAvailable;
-  Location? get location => _location;
   bool get isCheckedIn => _isCheckedIn;
   DateTime? get checkInTime => _checkInTime;
   double? get distance => _distance;
-  Location? get assignedLocation => _assignedLocation;
   String? get headNurseSignature => _headNurseSignature;
   String? get totalHoursWorked => _totalHoursWorked;
   WorkingHours? get workingHours => _workingHours;
   bool get isLoading => _isLoading;
   List<String> get readyToWorkDates => _readyToWorkDates;
   ReadyToWorkResponse? get readyToWorkData => _readyToWorkData;
-  List<DateTime> get proposedDates => _proposedDates;
+  List<ProposedDateItem> get proposedDates => _proposedDates;
   String? get message => _message;
+  List<AssignedDate> get assignedDates => _assignedDates;
+  bool get hasNewNotifications => _hasNewNotifications;
 
   String formatDateTime(DateTime dateTime) {
     final localDateTime = dateTime.toLocal();
     return DateFormat('hh:mm a').format(localDateTime);
+  }
+
+  void markNotificationsAsRead() {
+    if (_hasNewNotifications) {
+      _hasNewNotifications = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> registerProvider({
@@ -161,8 +170,8 @@ class UserProvider with ChangeNotifier {
 
         try {
           await fetchUserProfileProvider();
-          // Fetch location after successful login
           await fetchLocationProvider();
+          await fetchProposedDatesProvider();
         } catch (locationError) {
           print('Error fetching profile or location: $locationError');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -228,9 +237,9 @@ class UserProvider with ChangeNotifier {
             print('Auto-login: Profile fetched successfully');
             profileSuccess = true;
 
-            // Try to fetch location data (but don't fail login if this fails)
             try {
               await fetchLocationProvider();
+              await fetchProposedDatesProvider();
             } catch (locationError) {
               print('Warning: Error fetching location: $locationError');
               // Continue with login even if location fetch fails
@@ -366,26 +375,49 @@ class UserProvider with ChangeNotifier {
 
   Future<void> fetchLocationProvider() async {
     if (_token == null) throw Exception('Token is missing');
-    try {
-      final response = await _apiService.fetchLocationAPI(_token!);
-      final Map<String, dynamic> responseBody = json.decode(response.body);
 
-      if (responseBody['success'] == true) {
-        _location = Location.fromJson(responseBody['location']);
-        print('Fetched Location: $_location');
-        notifyListeners();
+    try {
+      final AssignedLocationResponse response =
+          await _apiService.fetchLocationAPI(_token!);
+
+      _assignedDates = response.assignedDates;
+
+      if (response.success) {
+        print('Fetched Assigned Dates: ${_assignedDates?.length ?? 0} items');
       } else {
-        throw Exception('Failed to fetch location');
+        print('Issue fetching location data: ${response.message}');
       }
+
+      notifyListeners();
     } catch (e) {
+      _assignedDates = [];
       print('Error fetching location: $e');
-      rethrow;
+      notifyListeners();
     }
   }
 
   Future<void> checkInProvider(double latitude, double longitude) async {
     if (_token == null) throw Exception('Token is missing');
+
     try {
+      // First, check if the user is within the required radius
+      final todayAssignment = _getTodayAssignment();
+
+      if (todayAssignment == null) {
+        throw Exception('No assignment found for today');
+      }
+
+      // Calculate distance between current location and assigned location
+      double distanceInMeters = Geolocator.distanceBetween(latitude, longitude,
+          todayAssignment.latitude, todayAssignment.longitude);
+
+      // Check if user is within radius (100 meters)
+      if (distanceInMeters > 1000) {
+        throw Exception(
+            'RadiusException: You must be within 500 meters of your assigned location');
+      }
+
+      // If within radius, proceed with API call
       final response =
           await _apiService.checkInAPI(_token!, latitude, longitude);
       final responseBody = json.decode(response.body);
@@ -395,7 +427,6 @@ class UserProvider with ChangeNotifier {
         _checkInTime = DateTime.now();
         _isCheckedIn = true;
         _distance = responseBody['distance']?.toDouble() ?? 0.0;
-
         print(
             'Check-in successful at ${formatDateTime(_checkInTime!)}, Distance: $_distance');
         notifyListeners();
@@ -409,12 +440,32 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  AssignedDate? _getTodayAssignment() {
+    if (_assignedDates == null || _assignedDates!.isEmpty) {
+      return null;
+    }
+
+    String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return _assignedDates!.firstWhere(
+      (assignment) => assignment.date == today,
+      orElse: () => _assignedDates.isNotEmpty
+          ? _assignedDates.first
+          : throw Exception('No valid assignment found'),
+    );
+  }
+
   Future<Map<String, dynamic>> checkOutProvider(String headNurseSignature,
       String headNurseName, String latitude, String longitude) async {
     if (_token == null) throw Exception('Token is missing');
     try {
       final response = await _apiService.checkOutAPI(
           _token!, headNurseSignature, headNurseName, latitude, longitude);
+
+      // Check if body is empty or not JSON before trying to decode
+      if (response.body.isEmpty || !response.body.trim().startsWith('{')) {
+        throw Exception('Invalid response format: Not a valid JSON');
+      }
+
       final responseBody = json.decode(response.body);
       if (response.statusCode == 200 && responseBody['success'] == true) {
         final checkOutTime = DateTime.now();
@@ -590,24 +641,26 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchProposedDatesProvider() async {
-    _isLoading = true;
-    notifyListeners();
+Future<void> fetchProposedDatesProvider() async {
+  _isLoading = true;
+  notifyListeners();
 
-    try {
-      final response = await _apiService.fetchProposedDatesAPI(token!);
-      final jsonData = jsonDecode(response.body);
-      final model = ProposedDatesModel.fromJson(jsonData);
-      _proposedDates = model.proposedDates;
-      print('Fetched Proposed Dates: $_proposedDates');
-    } catch (e) {
-      print('Error fetching proposed dates: $e');
-      rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+  try {
+    final model = await _apiService.fetchProposedDatesAPI(token!);
+    _proposedDates = model.proposedDates;
+
+    // Set hasNewNotifications flag if there are proposed dates
+    _hasNewNotifications = _proposedDates.isNotEmpty;
+
+    print('Fetched Proposed Dates: $_proposedDates');
+  } catch (e) {
+    print('Error fetching proposed dates: $e');
+    rethrow;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
   }
+}
 
   Future<void> respondToRequest(List<Map<String, String>> responses) async {
     if (_token == null) throw Exception('Token is missing');
@@ -621,6 +674,9 @@ class UserProvider with ChangeNotifier {
       final responseBody = json.decode(response.body);
 
       if (response.statusCode == 200 && responseBody['success'] == true) {
+        await fetchProposedDatesProvider();
+        markNotificationsAsRead();
+        await fetchLocationProvider();
         print('Responses submitted successfully');
         // Update state or UI if needed
         notifyListeners();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:humble/model/admin_model.dart';
 import 'package:humble/provider/admin_providers.dart';
 import 'package:humble/view/admin/available_employee_calender.dart';
@@ -45,7 +46,10 @@ class _AvailableEmployeesState extends State<AvailableEmployees> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load data: $e'),
+            content: Text(
+              'Failed to load data: $e',
+              style: GoogleFonts.montserrat(),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -110,12 +114,16 @@ class _AvailableEmployeesState extends State<AvailableEmployees> {
 
   @override
   Widget build(BuildContext context) {
+    final TextTheme montserratTextTheme = GoogleFonts.montserratTextTheme(
+      Theme.of(context).textTheme,
+    );
+    
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Available Employees',
-          style: TextStyle(
+          style: GoogleFonts.montserrat(
             fontSize: 22,
             fontWeight: FontWeight.bold,
             color: Colors.black,
@@ -157,7 +165,7 @@ class _AvailableEmployeesState extends State<AvailableEmployees> {
                                       const SizedBox(height: 24),
                                       Text(
                                         'No available employees',
-                                        style: TextStyle(
+                                        style: GoogleFonts.montserrat(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.grey[800],
@@ -166,7 +174,7 @@ class _AvailableEmployeesState extends State<AvailableEmployees> {
                                       const SizedBox(height: 8),
                                       Text(
                                         'Pull down to refresh',
-                                        style: TextStyle(
+                                        style: GoogleFonts.montserrat(
                                           fontSize: 16,
                                           color: Colors.grey[600],
                                         ),
@@ -194,6 +202,7 @@ class _AvailableEmployeesState extends State<AvailableEmployees> {
                                 hasAssignedDates: hasAssignedDates,
                                 onTap: () =>
                                     _showAvailabilityPage(context, user),
+                                textTheme: montserratTextTheme,
                               );
                             },
                           ),
@@ -209,12 +218,14 @@ class _EmployeeListItem extends StatelessWidget {
   final ReadyToWorkUser user;
   final bool hasAssignedDates;
   final VoidCallback onTap;
+  final TextTheme textTheme;
 
   const _EmployeeListItem({
     Key? key,
     required this.user,
     this.hasAssignedDates = false,
     required this.onTap,
+    required this.textTheme,
   }) : super(key: key);
 
   @override
@@ -245,7 +256,7 @@ class _EmployeeListItem extends StatelessWidget {
                   user.name.isNotEmpty
                       ? user.name.substring(0, 1).toUpperCase()
                       : '?',
-                  style: const TextStyle(
+                  style: GoogleFonts.montserrat(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -259,7 +270,7 @@ class _EmployeeListItem extends StatelessWidget {
                   children: [
                     Text(
                       user.name,
-                      style: const TextStyle(
+                      style: GoogleFonts.montserrat(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                         color: Colors.black,
@@ -267,7 +278,7 @@ class _EmployeeListItem extends StatelessWidget {
                     ),
                     Text(
                       user.phoneNumber,
-                      style: TextStyle(
+                      style: GoogleFonts.montserrat(
                         color: Colors.grey.shade600,
                         fontSize: 14,
                       ),
@@ -283,9 +294,9 @@ class _EmployeeListItem extends StatelessWidget {
                     color: const Color(0xFF79C9FF).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Assigned',
-                    style: TextStyle(
+                    style: GoogleFonts.montserrat(
                       color: Color(0xFF79C9FF),
                       fontWeight: FontWeight.bold,
                       fontSize: 12,

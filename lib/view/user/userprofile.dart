@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:humble/provider/user_providers.dart';
 import 'package:humble/view/user/change_password.dart';
+import 'package:humble/view/user/my_shedules.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -63,7 +64,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           const Spacer(),
                           Text(
                             'My Profile',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.montserrat(
                               color: Colors.white,
                               fontSize: 32,
                               fontWeight: FontWeight.w600,
@@ -84,122 +85,122 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           borderRadius:
                               BorderRadius.vertical(top: Radius.circular(30)),
                         ),
-                        child: SingleChildScrollView(
-                          physics: AlwaysScrollableScrollPhysics(),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight:
-                                  MediaQuery.of(context).size.height - 150,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.max,
-                              children: [
-                                SizedBox(height: 110),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: MediaQuery.of(context).size.height - 150,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              SizedBox(height: 110),
 
-                                Text(
-                                  user.name.toUpperCase(),
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              Text(
+                                user.name.toUpperCase(),
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  "Floor Manager",
-                                  style: GoogleFonts.roboto(
-                                    fontSize: 14,
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "Employee",
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
                                 ),
+                              ),
 
-                                // Contact Section
-                                _buildSectionHeader('CONTACT'),
-                                Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      _buildContactItem(
-                                          Icons.email, user.email),
-                                      const SizedBox(height: 16),
-                                      _buildContactItem(
-                                          Icons.phone, user.phoneNumber),
-                                      const SizedBox(height: 16),
-                                      _buildContactItem(
-                                          Icons.location_on, "Taman Anggrek"),
-                                    ],
-                                  ),
+                              // Contact Section
+                              _buildSectionHeader('CONTACT'),
+                              Container(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-
-                                // Account Section
-                                const SizedBox(height: 24),
-                                _buildSectionHeader('ACCOUNT'),
-                                Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      _buildAccountItem(
-                                        context,
-                                        Icons.person_outline,
-                                        'Personal Data',
-                                        () {}, // Add navigation
-                                      ),
-                                      _buildAccountItem(
-                                        context,
-                                        Icons.lock_outline,
-                                        'Change Password',
-                                        () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                                builder: (context) =>
-                                                    const ChangePasswordScreen()),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
+                                child: Column(
+                                  children: [
+                                    _buildContactItem(Icons.person, user.name),
+                                    const SizedBox(height: 16),
+                                    _buildContactItem(Icons.email, user.email),
+                                    const SizedBox(height: 16),
+                                    _buildContactItem(
+                                        Icons.phone, user.phoneNumber),
+                                  ],
                                 ),
+                              ),
 
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 30),
-                                  child: ElevatedButton(
-                                    onPressed: _logout,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2196F3),
-                                      minimumSize:
-                                          const Size(double.infinity, 50),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
+                              // Account Section
+                              const SizedBox(height: 4),
+                              _buildSectionHeader('ACCOUNT'),
+                              Container(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  children: [
+                                    _buildAccountItem(
+                                      context,
+                                      Icons.calendar_month_outlined,
+                                      'My Schedules',
+                                      () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const AssignedLocationsScreen()),
+                                        );
+                                      }, // Add navigation
                                     ),
-                                    child: Text(
-                                      'Logout',
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                    _buildAccountItem(
+                                      context,
+                                      Icons.lock_outline,
+                                      'Change Password',
+                                      () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const ChangePasswordScreen()),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Spacer(),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 20),
+                                child: ElevatedButton(
+                                  onPressed: _logout,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2196F3),
+                                    minimumSize:
+                                        const Size(double.infinity, 50),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
+                                  child: Text(
+                                    'Logout',
+                                    style: GoogleFonts.montserrat(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
+                              ),
 
-                                // Add some bottom padding for better scrolling experience
-                                SizedBox(height: 20),
-                              ],
-                            ),
+                              SizedBox(height: 20),
+                            ],
                           ),
                         ),
                       ),
@@ -252,7 +253,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         alignment: Alignment.centerLeft,
         child: Text(
           title,
-          style: GoogleFonts.lato(
+          style: GoogleFonts.montserrat(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Colors.grey[700],
@@ -269,7 +270,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         const SizedBox(width: 12),
         Text(
           text,
-          style: GoogleFonts.roboto(fontSize: 14),
+          style: GoogleFonts.montserrat(fontSize: 14),
         ),
       ],
     );
@@ -286,7 +287,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       leading: Icon(icon, color: const Color(0xFF2196F3), size: 22),
       title: Text(
         title,
-        style: GoogleFonts.roboto(fontSize: 14),
+        style: GoogleFonts.montserrat(fontSize: 14),
       ),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 22),
       onTap: onTap,
